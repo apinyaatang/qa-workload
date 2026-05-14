@@ -48,11 +48,11 @@ export interface PlanningImportResult {
 
 // ── Filters ──────────────────────────────────────────────────────────────────
 export interface PlanningFilters {
-  iteration: string
+  iterations: string[]   // multi-select
   priority: string
-  status: string
-  tester: string
-  testLead: string
+  statuses: string[]     // multi-select
+  testers: string[]      // multi-select
+  testLeads: string[]    // multi-select
   uatDateFrom: string
   uatDateTo: string
   goLiveDateFrom: string

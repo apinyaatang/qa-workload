@@ -23,11 +23,11 @@ import { useApp } from '../../context/AppContext'
 
 const EMPTY_FILTERS: PlanningFiltersType = {
   search: '',
-  iteration: '',
+  iterations:   [],
   priority: '',
-  status: '',
-  tester: '',
-  testLead: '',
+  statuses:     [],
+  testers:      [],
+  testLeads:    [],
   uatDateFrom: '',
   uatDateTo: '',
   goLiveDateFrom: '',
@@ -44,27 +44,23 @@ function applyFilters(projects: PlanningProject[], filters: PlanningFiltersType)
   const q = filters.search.trim().toLowerCase()
 
   return projects.filter(p => {
-    // Search
+    // Free-text search
     if (q) {
-      const haystack = [p.projectName, p.feature, p.tester, p.testLead]
-        .join(' ')
-        .toLowerCase()
+      const haystack = [p.projectName, p.feature, p.tester, p.testLead].join(' ').toLowerCase()
       if (!haystack.includes(q)) return false
     }
-    // Dropdown: exact match
-    if (filters.iteration && p.iteration !== filters.iteration) return false
+    // Multi-select filters (empty array = no filter)
+    if (filters.iterations.length  && !filters.iterations.includes(p.iteration))   return false
+    if (filters.statuses.length    && !filters.statuses.includes(p.status))         return false
+    if (filters.testers.length     && !filters.testers.includes(p.tester))          return false
+    if (filters.testLeads.length   && !filters.testLeads.includes(p.testLead))      return false
+    // Single-select
     if (filters.priority && p.priority !== filters.priority) return false
-    if (filters.tester && p.tester !== filters.tester) return false
-    if (filters.testLead && p.testLead !== filters.testLead) return false
-    // Status: contains (case-insensitive)
-    if (filters.status && !p.status.toLowerCase().includes(filters.status.toLowerCase())) return false
-    // UAT date range
-    if (filters.uatDateFrom && (p.uatDate ?? '') < filters.uatDateFrom) return false
-    if (filters.uatDateTo && (p.uatDate ?? '') > filters.uatDateTo) return false
-    // Go live date range
+    // Date ranges
+    if (filters.uatDateFrom    && (p.uatDate    ?? '') < filters.uatDateFrom)    return false
+    if (filters.uatDateTo      && (p.uatDate    ?? '') > filters.uatDateTo)      return false
     if (filters.goLiveDateFrom && (p.goLiveDate ?? '') < filters.goLiveDateFrom) return false
-    if (filters.goLiveDateTo && (p.goLiveDate ?? '') > filters.goLiveDateTo) return false
-
+    if (filters.goLiveDateTo   && (p.goLiveDate ?? '') > filters.goLiveDateTo)   return false
     return true
   })
 }
@@ -234,7 +230,7 @@ export default function PlanningView() {
 
   useEffect(() => {
     if (!planningInitialTester) return
-    setFilters(f => ({ ...f, tester: planningInitialTester }))
+    setFilters(f => ({ ...f, testers: [planningInitialTester] }))
     setTab('table')                         // land on Table tab to show filtered rows
     setPlanningInitialTester(null)           // consume & clear the signal
   }, [planningInitialTester, setPlanningInitialTester])
