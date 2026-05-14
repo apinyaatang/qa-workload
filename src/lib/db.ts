@@ -1,9 +1,8 @@
 /**
  * db.ts — thin service layer
- * แปลง snake_case (Supabase) ↔ camelCase (app types)
- * ใช้ any cast เพื่อ bypass generic inference เมื่อ URL ยังไม่ได้ตั้งค่า
+ * All functions guard against !isConfigured and return safe defaults.
  */
-import { supabase } from './supabase'
+import { supabase, isConfigured } from './supabase'
 import type {
   Employee, Task, LeaveRecord, PublicHoliday, Project, ImportSession,
 } from '../types'
@@ -15,6 +14,7 @@ function throwIf(error: unknown, ctx: string) {
 // ─── Employee ─────────────────────────────────────────────────────────────────
 export const employeeDb = {
   async getAll(): Promise<Employee[]> {
+    if (!isConfigured) return []
     const { data, error } = await (supabase as any)
       .from('employees').select('*').order('first_name')
     throwIf(error, 'employees.getAll')
@@ -22,19 +22,33 @@ export const employeeDb = {
       id: r.id, firstName: r.first_name, lastName: r.last_name,
       department: r.department, position: r.position,
       skills: r.skills ?? [], startDate: r.start_date, isActive: r.is_active,
+      employeeCode: r.employee_code ?? undefined,
+      nickname: r.nickname ?? undefined,
+      group: r.group_name ?? undefined,
+      team: r.team ?? undefined,
+      tier: r.tier ?? undefined,
+      wfhDays: r.wfh_days ?? [],
     }))
   },
 
   async upsert(emp: Employee): Promise<void> {
+    if (!isConfigured) return
     const { error } = await (supabase as any).from('employees').upsert({
       id: emp.id, first_name: emp.firstName, last_name: emp.lastName,
       department: emp.department, position: emp.position,
       skills: emp.skills, start_date: emp.startDate, is_active: emp.isActive,
+      employee_code: emp.employeeCode ?? null,
+      nickname: emp.nickname ?? null,
+      group_name: emp.group ?? null,
+      team: emp.team ?? null,
+      tier: emp.tier ?? null,
+      wfh_days: emp.wfhDays ?? [],
     })
     throwIf(error, 'employees.upsert')
   },
 
   async delete(id: string): Promise<void> {
+    if (!isConfigured) return
     const { error } = await (supabase as any).from('employees').delete().eq('id', id)
     throwIf(error, 'employees.delete')
   },
@@ -43,6 +57,7 @@ export const employeeDb = {
 // ─── Project ──────────────────────────────────────────────────────────────────
 export const projectDb = {
   async getAll(): Promise<Project[]> {
+    if (!isConfigured) return []
     const { data, error } = await (supabase as any)
       .from('projects').select('*').order('created_at', { ascending: false })
     throwIf(error, 'projects.getAll')
@@ -58,6 +73,7 @@ export const projectDb = {
   },
 
   async upsert(p: Project): Promise<void> {
+    if (!isConfigured) return
     const { error } = await (supabase as any).from('projects').upsert({
       id: p.id, code: p.code, name: p.name,
       description: p.description ?? null,
@@ -69,71 +85,24 @@ export const projectDb = {
   },
 
   async delete(id: string): Promise<void> {
+    if (!isConfigured) return
     const { error } = await (supabase as any).from('projects').delete().eq('id', id)
     throwIf(error, 'projects.delete')
   },
 }
 
-// ─── Task ─────────────────────────────────────────────────────────────────────
+// ─── Task (localStorage only — no Supabase table) ─────────────────────────────
 export const taskDb = {
-  async getAll(): Promise<Task[]> {
-    const { data, error } = await (supabase as any)
-      .from('tasks').select('*').order('created_at')
-    throwIf(error, 'tasks.getAll')
-    return (data ?? []).map((r: any) => ({
-      id: r.id, name: r.name, assigneeIds: r.assignee_ids ?? [],
-      estimatedHours: r.estimated_hours, deadline: r.deadline,
-      taskType: r.task_type as Task['taskType'],
-      source: r.source as Task['source'],
-      status: r.status as Task['status'],
-      periodStart: r.period_start, periodEnd: r.period_end,
-      description: r.description ?? undefined,
-      azureWorkItemId: r.azure_work_item_id ?? undefined,
-    }))
-  },
-
-  async upsert(t: Task): Promise<void> {
-    const { error } = await (supabase as any).from('tasks').upsert({
-      id: t.id, name: t.name, assignee_ids: t.assigneeIds,
-      estimated_hours: t.estimatedHours, deadline: t.deadline,
-      task_type: t.taskType, source: t.source, status: t.status,
-      period_start: t.periodStart, period_end: t.periodEnd,
-      description: t.description ?? null,
-      azure_work_item_id: t.azureWorkItemId ?? null,
-    })
-    throwIf(error, 'tasks.upsert')
-  },
-
-  async delete(id: string): Promise<void> {
-    const { error } = await (supabase as any).from('tasks').delete().eq('id', id)
-    throwIf(error, 'tasks.delete')
-  },
-
-  async replacePlanned(periodStart: string, periodEnd: string, newTasks: Task[]): Promise<void> {
-    const { error: delErr } = await (supabase as any).from('tasks')
-      .delete()
-      .eq('task_type', 'Planned')
-      .eq('period_start', periodStart)
-      .eq('period_end', periodEnd)
-    throwIf(delErr, 'tasks.replacePlanned.delete')
-    if (newTasks.length === 0) return
-    const { error: insErr } = await (supabase as any).from('tasks').insert(
-      newTasks.map(t => ({
-        id: t.id, name: t.name, assignee_ids: t.assigneeIds,
-        estimated_hours: t.estimatedHours, deadline: t.deadline,
-        task_type: t.taskType, source: t.source, status: t.status,
-        period_start: t.periodStart, period_end: t.periodEnd,
-        description: t.description ?? null,
-        azure_work_item_id: t.azureWorkItemId ?? null,
-      }))
-    )
-    throwIf(insErr, 'tasks.replacePlanned.insert')
-  },
+  async getAll(): Promise<Task[]> { return [] },
+  async upsert(_t: Task): Promise<void> {},
+  async delete(_id: string): Promise<void> {},
+  async replacePlanned(_s: string, _e: string, _t: Task[]): Promise<void> {},
 }
 
 // ─── Leave Record ─────────────────────────────────────────────────────────────
 export const leaveDb = {
   async getAll(): Promise<LeaveRecord[]> {
+    if (!isConfigured) return []
     const { data, error } = await (supabase as any)
       .from('leave_records').select('*').order('date')
     throwIf(error, 'leaves.getAll')
@@ -146,6 +115,7 @@ export const leaveDb = {
   },
 
   async insert(l: LeaveRecord): Promise<void> {
+    if (!isConfigured) return
     const { error } = await (supabase as any).from('leave_records').insert({
       id: l.id, employee_id: l.employeeId, date: l.date,
       leave_type: l.leaveType, status: l.status, note: l.note ?? null,
@@ -154,6 +124,7 @@ export const leaveDb = {
   },
 
   async updateStatus(id: string, status: 'approved' | 'rejected'): Promise<void> {
+    if (!isConfigured) return
     const { error } = await (supabase as any).from('leave_records')
       .update({ status }).eq('id', id)
     throwIf(error, 'leaves.updateStatus')
@@ -163,6 +134,7 @@ export const leaveDb = {
 // ─── Public Holiday ───────────────────────────────────────────────────────────
 export const holidayDb = {
   async getAll(): Promise<PublicHoliday[]> {
+    if (!isConfigured) return []
     const { data, error } = await (supabase as any)
       .from('public_holidays').select('*').order('date')
     throwIf(error, 'holidays.getAll')
@@ -170,12 +142,14 @@ export const holidayDb = {
   },
 
   async insert(h: PublicHoliday): Promise<void> {
+    if (!isConfigured) return
     const { error } = await (supabase as any).from('public_holidays')
       .insert({ id: h.id, date: h.date, name: h.name })
     throwIf(error, 'holidays.insert')
   },
 
   async delete(id: string): Promise<void> {
+    if (!isConfigured) return
     const { error } = await (supabase as any).from('public_holidays').delete().eq('id', id)
     throwIf(error, 'holidays.delete')
   },
@@ -184,6 +158,7 @@ export const holidayDb = {
 // ─── Import Session ───────────────────────────────────────────────────────────
 export const importDb = {
   async getAll(): Promise<ImportSession[]> {
+    if (!isConfigured) return []
     const { data, error } = await (supabase as any)
       .from('import_sessions').select('*').order('imported_at', { ascending: false })
     throwIf(error, 'imports.getAll')
@@ -197,6 +172,7 @@ export const importDb = {
   },
 
   async insert(s: ImportSession): Promise<void> {
+    if (!isConfigured) return
     const { error } = await (supabase as any).from('import_sessions').insert({
       id: s.id, file_name: s.fileName, imported_at: s.importedAt,
       import_status: s.importStatus, total_rows: s.totalRows,
@@ -207,12 +183,14 @@ export const importDb = {
   },
 
   async markApplied(id: string): Promise<void> {
+    if (!isConfigured) return
     const { error } = await (supabase as any).from('import_sessions')
       .update({ applied_to_tasks: true }).eq('id', id)
     throwIf(error, 'imports.markApplied')
   },
 
   async delete(id: string): Promise<void> {
+    if (!isConfigured) return
     const { error } = await (supabase as any).from('import_sessions').delete().eq('id', id)
     throwIf(error, 'imports.delete')
   },

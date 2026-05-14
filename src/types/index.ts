@@ -32,9 +32,10 @@ export interface Employee {
   avatar?: string
   // Extended fields (from CSV import)
   employeeCode?: string   // numeric ID from HR system e.g. "1639"
-  nickname?: string       // short name in parentheses e.g. "Mameaw"
+  nickname?: string       // ชื่อเล่น e.g. "Mameaw"
   orgNumber?: number      // Number of organization
-  group?: string          // Group / team e.g. "Product", "Project 1"
+  group?: string          // Group จาก CSV e.g. "Product", "Project 1"
+  team?: string           // Team ที่สังกัด e.g. "QA Team A", "Dev Team"
   tier?: string           // Tier level
   wfhDays?: string[]      // WFH days e.g. ["Mon","Fri"]
   inactiveDate?: string   // ISO date when became inactive

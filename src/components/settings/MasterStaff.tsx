@@ -5,13 +5,12 @@ import type { Employee, LeaveType } from '../../types'
 import { formatDate } from '../../utils/dateUtils'
 import { parseStaffCsv, type StaffCsvRow } from '../../utils/staffCsvParser'
 
-const DEPARTMENTS = ['Engineering', 'Design', 'Product', 'Marketing', 'QA', 'DevOps', 'Finance', 'HR']
+const DEPARTMENTS = ['Design', 'BA', 'Dev', 'QA']
 const POSITIONS = [
-  'Senior Developer', 'Developer', 'Junior Developer',
-  'UI/UX Designer', 'Graphic Designer',
-  'Product Manager', 'Business Analyst',
-  'QA Engineer', 'DevOps Engineer',
-  'Project Manager', 'Team Lead', 'CTO', 'Other',
+  'Design',
+  'BA Manager', 'BA Lead', 'Senior BA',
+  'Senior Dev', 'Junior Dev',
+  'QA Manager', 'QA Lead', 'Senior QA', 'QA',
 ]
 const LEAVE_TYPES: { value: LeaveType; label: string }[] = [
   { value: 'annual',    label: 'ลาพักร้อน' },
@@ -36,8 +35,9 @@ function Field({ label, children, required }: { label: string; children: React.R
 
 function emptyEmp(): Omit<Employee, 'id'> {
   return {
-    firstName: '', lastName: '', department: 'Engineering',
-    position: 'Developer', skills: [], startDate: '', isActive: true,
+    firstName: '', lastName: '', nickname: '', team: '',
+    department: 'QA', position: 'QA',
+    skills: [], startDate: '', isActive: true,
   }
 }
 
@@ -76,8 +76,12 @@ export default function MasterStaff() {
   }
 
   function openEdit(emp: Employee) {
-    setForm({ firstName: emp.firstName, lastName: emp.lastName, department: emp.department,
-      position: emp.position, skills: [...emp.skills], startDate: emp.startDate, isActive: emp.isActive })
+    setForm({
+      firstName: emp.firstName, lastName: emp.lastName,
+      nickname: emp.nickname ?? '', team: emp.team ?? '',
+      department: emp.department, position: emp.position,
+      skills: [...emp.skills], startDate: emp.startDate, isActive: emp.isActive,
+    })
     setSkillInput('')
     setEditId(emp.id)
     setShowForm(true)
@@ -94,10 +98,15 @@ export default function MasterStaff() {
   function handleSave(e: React.FormEvent) {
     e.preventDefault()
     if (!form.firstName || !form.lastName || !form.startDate) return
+    const payload = {
+      ...form,
+      nickname: (form.nickname as string)?.trim() || undefined,
+      team:     (form.team as string)?.trim()     || undefined,
+    }
     if (editId) {
-      updateEmployee({ ...form, id: editId })
+      updateEmployee({ ...payload, id: editId })
     } else {
-      addEmployee({ ...form, id: `emp-${Date.now()}` })
+      addEmployee({ ...payload, id: `emp-${Date.now()}` })
     }
     setShowForm(false)
   }
@@ -195,8 +204,9 @@ export default function MasterStaff() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-100">
-                <th className="text-left px-5 py-3 font-medium">พนักงาน</th>
+                <th className="text-left px-5 py-3 font-medium">พนักงาน / ชื่อเล่น</th>
                 <th className="text-left px-4 py-3 font-medium">แผนก / ตำแหน่ง</th>
+                <th className="text-left px-4 py-3 font-medium">Team</th>
                 <th className="text-left px-4 py-3 font-medium">Skills</th>
                 <th className="text-left px-4 py-3 font-medium">วันเริ่มงาน</th>
                 <th className="text-left px-4 py-3 font-medium">สถานะ</th>
@@ -220,14 +230,20 @@ export default function MasterStaff() {
                             <User size={15} className="text-indigo-500" />
                           </div>
                           <div>
-                            <p className="font-semibold text-gray-900">{emp.firstName} {emp.lastName}</p>
-                            <p className="text-xs text-gray-400 font-mono">{emp.id}</p>
+                            <p className="font-semibold text-gray-900">
+                              {emp.firstName} {emp.lastName}
+                              {emp.nickname && <span className="ml-1 text-xs text-indigo-500 font-medium">({emp.nickname})</span>}
+                            </p>
+                            <p className="text-xs text-gray-400 font-mono">{emp.employeeCode ?? emp.id}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-3">
                         <p className="text-gray-700 font-medium">{emp.department}</p>
                         <p className="text-xs text-gray-400">{emp.position}</p>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 text-xs">
+                        {emp.team || <span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1 max-w-[200px]">
@@ -363,6 +379,17 @@ export default function MasterStaff() {
                 <Field label="นามสกุล *" required>
                   <input value={form.lastName} onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))}
                     placeholder="นามสกุล" className={inputCls} required />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="ชื่อเล่น (Nickname)">
+                  <input value={(form as any).nickname ?? ''} onChange={e => setForm(f => ({ ...f, nickname: e.target.value }))}
+                    placeholder="เช่น Mameaw, Ant, Koi" className={inputCls} />
+                </Field>
+                <Field label="Team">
+                  <input value={(form as any).team ?? ''} onChange={e => setForm(f => ({ ...f, team: e.target.value }))}
+                    placeholder="เช่น QA Team A, Dev Team 1" className={inputCls} />
                 </Field>
               </div>
 

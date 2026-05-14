@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { supabase, isConfigured } from './supabase'
 import type { PlanningProject, PlanningImportResult } from '../types/planning'
 
 function throwIf(error: unknown, ctx: string) {
@@ -65,6 +65,7 @@ function fromRow(r: any): PlanningProject {
 
 export const planningDb = {
   async getAll(): Promise<PlanningProject[]> {
+    if (!isConfigured) return []
     const { data, error } = await (supabase as any)
       .from('planning_projects')
       .select('*')
@@ -74,7 +75,7 @@ export const planningDb = {
   },
 
   async getExistingIds(ids: string[]): Promise<Set<string>> {
-    if (ids.length === 0) return new Set()
+    if (!isConfigured || ids.length === 0) return new Set()
     const { data, error } = await (supabase as any)
       .from('planning_projects')
       .select('id')
@@ -83,10 +84,6 @@ export const planningDb = {
     return new Set((data ?? []).map((r: any) => r.id as string))
   },
 
-  /**
-   * Upsert rows from a CSV import.
-   * Returns counts of inserted, updated, and failed rows.
-   */
   async upsertMany(projects: PlanningProject[]): Promise<PlanningImportResult> {
     const result: PlanningImportResult = {
       totalRows: projects.length,
@@ -95,12 +92,10 @@ export const planningDb = {
       failedRows: 0,
       errors: [],
     }
-    if (projects.length === 0) return result
+    if (!isConfigured || projects.length === 0) return result
 
-    // Determine which IDs already exist
     const existingIds = await planningDb.getExistingIds(projects.map(p => p.id))
 
-    // Upsert in batches of 100 to stay within Supabase limits
     const BATCH = 100
     for (let i = 0; i < projects.length; i += BATCH) {
       const batch = projects.slice(i, i + BATCH)
@@ -111,7 +106,6 @@ export const planningDb = {
         .upsert(rows, { onConflict: 'id', ignoreDuplicates: false })
 
       if (error) {
-        // If batch fails, mark all rows in batch as failed
         batch.forEach(p => {
           result.failedRows++
           result.errors.push({ rowNo: 0, id: p.id, message: error.message })
@@ -127,12 +121,14 @@ export const planningDb = {
   },
 
   async deleteById(id: string): Promise<void> {
+    if (!isConfigured) return
     const { error } = await (supabase as any)
       .from('planning_projects').delete().eq('id', id)
     throwIf(error, 'deleteById')
   },
 
   async updateField(id: string, field: string, value: unknown): Promise<void> {
+    if (!isConfigured) return
     const { error } = await (supabase as any)
       .from('planning_projects').update({ [field]: value }).eq('id', id)
     throwIf(error, 'updateField')
