@@ -1,0 +1,559 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  Upload, Loader2, AlertCircle, X, LayoutList, Users, CalendarClock, UserX, ClipboardList,
+} from 'lucide-react'
+import type {
+  PlanningProject,
+  PlanningFilters as PlanningFiltersType,
+  PlanningSortField,
+  PlanningSortState,
+  PlanningCsvRow,
+  PlanningImportResult,
+} from '../../types/planning'
+import { getUrgencyFlags, PRIORITY_ORDER } from '../../types/planning'
+import { planningDb } from '../../lib/planningDb'
+
+import { PlanningFilters } from './PlanningFilters'
+import { PlanningTable } from './PlanningTable'
+import TesterGanttView from './TesterGanttView'
+import { PlanningCsvImport } from './PlanningCsvImport'
+import { useApp } from '../../context/AppContext'
+
+// ── Constants ──────────────────────────────────────────────────────────────────
+
+const EMPTY_FILTERS: PlanningFiltersType = {
+  search: '',
+  iteration: '',
+  priority: '',
+  status: '',
+  tester: '',
+  testLead: '',
+  uatDateFrom: '',
+  uatDateTo: '',
+  goLiveDateFrom: '',
+  goLiveDateTo: '',
+}
+
+const DEFAULT_SORT: PlanningSortState = { field: 'goLiveDate', dir: 'asc' }
+
+type Tab = 'table' | 'workload'
+
+// ── Filter logic ───────────────────────────────────────────────────────────────
+
+function applyFilters(projects: PlanningProject[], filters: PlanningFiltersType): PlanningProject[] {
+  const q = filters.search.trim().toLowerCase()
+
+  return projects.filter(p => {
+    // Search
+    if (q) {
+      const haystack = [p.projectName, p.feature, p.tester, p.testLead]
+        .join(' ')
+        .toLowerCase()
+      if (!haystack.includes(q)) return false
+    }
+    // Dropdown: exact match
+    if (filters.iteration && p.iteration !== filters.iteration) return false
+    if (filters.priority && p.priority !== filters.priority) return false
+    if (filters.tester && p.tester !== filters.tester) return false
+    if (filters.testLead && p.testLead !== filters.testLead) return false
+    // Status: contains (case-insensitive)
+    if (filters.status && !p.status.toLowerCase().includes(filters.status.toLowerCase())) return false
+    // UAT date range
+    if (filters.uatDateFrom && (p.uatDate ?? '') < filters.uatDateFrom) return false
+    if (filters.uatDateTo && (p.uatDate ?? '') > filters.uatDateTo) return false
+    // Go live date range
+    if (filters.goLiveDateFrom && (p.goLiveDate ?? '') < filters.goLiveDateFrom) return false
+    if (filters.goLiveDateTo && (p.goLiveDate ?? '') > filters.goLiveDateTo) return false
+
+    return true
+  })
+}
+
+// ── Sort logic ─────────────────────────────────────────────────────────────────
+
+function applySort(projects: PlanningProject[], sort: PlanningSortState): PlanningProject[] {
+  const { field, dir } = sort
+  const mult = dir === 'asc' ? 1 : -1
+
+  return [...projects].sort((a, b) => {
+    let cmp = 0
+    switch (field) {
+      case 'priority':
+        cmp = (PRIORITY_ORDER[a.priority] ?? 4) - (PRIORITY_ORDER[b.priority] ?? 4)
+        break
+      case 'testingPercent':
+        cmp = (a.testingPercent ?? -1) - (b.testingPercent ?? -1)
+        break
+      case 'testEstimateDay':
+        cmp = (a.testEstimateDay ?? -1) - (b.testEstimateDay ?? -1)
+        break
+      case 'testDate':
+        cmp = (a.testDate ?? '').localeCompare(b.testDate ?? '')
+        break
+      case 'uatDate':
+        cmp = (a.uatDate ?? '').localeCompare(b.uatDate ?? '')
+        break
+      case 'goLiveDate':
+        cmp = (a.goLiveDate ?? '').localeCompare(b.goLiveDate ?? '')
+        break
+    }
+    return cmp * mult
+  })
+}
+
+// ── Urgency summary ────────────────────────────────────────────────────────────
+
+type QuickFilter = 'none' | 'near-uat' | 'near-golive' | 'missing-tester' | 'missing-estimate'
+
+interface UrgencyCounts {
+  overloaded: number
+  nearUat: number
+  nearGoLive: number
+  missingTester: number
+  missingEstimate: number
+}
+
+const NEAR_DAYS = 5   // window in calendar days
+
+function isWithinDays(iso: string | null | undefined, today: Date, days: number): boolean {
+  if (!iso) return false
+  const d = new Date(iso)
+  const diff = (d.getTime() - today.getTime()) / 86_400_000
+  return diff >= 0 && diff <= days
+}
+
+function getUrgencyCounts(projects: PlanningProject[], today: Date): UrgencyCounts {
+  const counts: UrgencyCounts = { overloaded: 0, nearUat: 0, nearGoLive: 0, missingTester: 0, missingEstimate: 0 }
+  const testerLoad = new Map<string, number>()
+
+  for (const p of projects) {
+    if (isWithinDays(p.uatDate,    today, NEAR_DAYS)) counts.nearUat++
+    if (isWithinDays(p.goLiveDate, today, NEAR_DAYS)) counts.nearGoLive++
+    const flags = getUrgencyFlags(p, today)
+    if (flags.includes('missing-tester'))   counts.missingTester++
+    if (flags.includes('missing-estimate')) counts.missingEstimate++
+    if (p.tester?.trim() && p.testEstimateDay != null) {
+      testerLoad.set(p.tester, (testerLoad.get(p.tester) ?? 0) + p.testEstimateDay)
+    }
+  }
+  for (const days of testerLoad.values()) {
+    if (days > 20) counts.overloaded++
+  }
+  return counts
+}
+
+/**
+ * Group rows by projectName, sort groups by the earliest date (asc),
+ * and sort rows within each group by date descending.
+ */
+function groupAndSortByDate(
+  rows: PlanningProject[],
+  dateKey: 'uatDate' | 'goLiveDate',
+): PlanningProject[] {
+  // Build group map: projectName → rows
+  const groups = new Map<string, PlanningProject[]>()
+  for (const p of rows) {
+    const key = p.projectName?.trim() || '(ไม่มีชื่อ)'
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(p)
+  }
+
+  // Sort rows within each group by date DESC (latest first within same project)
+  for (const rows of groups.values()) {
+    rows.sort((a, b) => (b[dateKey] ?? '').localeCompare(a[dateKey] ?? ''))
+  }
+
+  // Sort groups by their earliest (min) date ASC
+  const sortedGroups = [...groups.entries()].sort(([, aRows], [, bRows]) => {
+    const aMin = aRows.map(r => r[dateKey] ?? '').sort()[0] ?? ''
+    const bMin = bRows.map(r => r[dateKey] ?? '').sort()[0] ?? ''
+    return aMin.localeCompare(bMin)
+  })
+
+  // Flatten
+  return sortedGroups.flatMap(([, rows]) => rows)
+}
+
+function applyQuickFilter(rows: PlanningProject[], qf: QuickFilter, today: Date): PlanningProject[] {
+  if (qf === 'near-uat') {
+    const filtered = rows.filter(p => isWithinDays(p.uatDate, today, NEAR_DAYS))
+    return groupAndSortByDate(filtered, 'uatDate')
+  }
+  if (qf === 'near-golive') {
+    const filtered = rows.filter(p => isWithinDays(p.goLiveDate, today, NEAR_DAYS))
+    return groupAndSortByDate(filtered, 'goLiveDate')
+  }
+  if (qf === 'missing-tester')   return rows.filter(p => !p.tester?.trim())
+  if (qf === 'missing-estimate') return rows.filter(p => p.testEstimateDay == null)
+  return rows
+}
+
+// ── Modal wrapper ──────────────────────────────────────────────────────────────
+
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-12 px-4 pb-4 overflow-y-auto">
+      <div className="relative w-full max-w-4xl bg-white rounded-xl shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-base font-semibold text-gray-800">{title}</h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded hover:bg-gray-100 text-gray-500 transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="px-6 py-5">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────────
+
+export default function PlanningView() {
+  const { publicHolidays, employees, planningInitialTester, setPlanningInitialTester } = useApp()
+  const holidaySet = useMemo(
+    () => new Set(publicHolidays.map(h => h.date)),
+    [publicHolidays],
+  )
+  const today = useMemo(() => new Date(), [])
+
+  const [projects, setProjects] = useState<PlanningProject[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const [tab, setTab] = useState<Tab>('table')
+  const [filters, setFilters] = useState<PlanningFiltersType>(EMPTY_FILTERS)
+  const [sort, setSort] = useState<PlanningSortState>(DEFAULT_SORT)
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('none')
+  const [showImport, setShowImport] = useState(false)
+
+  // ── Apply initial tester filter when navigated from Monitor and Assign ──────
+
+  useEffect(() => {
+    if (!planningInitialTester) return
+    setFilters(f => ({ ...f, tester: planningInitialTester }))
+    setTab('table')                         // land on Table tab to show filtered rows
+    setPlanningInitialTester(null)           // consume & clear the signal
+  }, [planningInitialTester, setPlanningInitialTester])
+
+  // ── Load data ────────────────────────────────────────────────────────────────
+
+  const loadProjects = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await planningDb.getAll()
+      setProjects(data)
+    } catch (err: any) {
+      setError(err.message ?? 'Failed to load planning data.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadProjects()
+  }, [loadProjects])
+
+  // ── Sort handler ─────────────────────────────────────────────────────────────
+
+  function handleSort(field: PlanningSortField) {
+    setSort(prev =>
+      prev.field === field
+        ? { field, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+        : { field, dir: 'asc' }
+    )
+  }
+
+  // ── Assign tester (inline edit) ──────────────────────────────────────────────
+
+  async function handleAssignTester(id: string, tester: string) {
+    // Optimistic update
+    setProjects(prev =>
+      prev.map(p => (p.id === id ? { ...p, tester } : p))
+    )
+    try {
+      await planningDb.updateField(id, 'tester', tester)
+    } catch {
+      // Roll back
+      await loadProjects()
+    }
+  }
+
+  // ── Filtered & sorted rows ───────────────────────────────────────────────────
+
+  // Base: search/dropdown filters applied (no sort yet)
+  const baseFiltered = useMemo(
+    () => applyFilters(projects, filters),
+    [projects, filters]
+  )
+
+  // Quick-filter + auto-sort applied to both Table and Gantt
+  const quickFiltered = useMemo(
+    () => applyQuickFilter(baseFiltered, quickFilter, today),
+    [baseFiltered, quickFilter, today]
+  )
+
+  // Table rows: manual sort on top (quick filter overrides sort for near-uat/near-golive)
+  const filteredRows = useMemo(() => {
+    // When near-uat / near-golive is active, quickFilter already sorted — skip manual sort
+    if (quickFilter === 'near-uat' || quickFilter === 'near-golive') return quickFiltered
+    return applySort(quickFiltered, sort)
+  }, [quickFiltered, quickFilter, sort])
+
+  // Gantt rows = same data (Gantt has its own internal group sort)
+  const ganttRows = filteredRows
+
+  // ── Urgency summary — always from full base (not filtered) ───────────────────
+
+  const urgency = useMemo(() => getUrgencyCounts(baseFiltered, today), [baseFiltered, today])
+
+  // ── Existing IDs set for import ──────────────────────────────────────────────
+
+  const existingIds = useMemo(
+    () => new Set(projects.map(p => p.id)),
+    [projects]
+  )
+
+  // ── Import callbacks ─────────────────────────────────────────────────────────
+
+  function handleImportComplete(_result: PlanningImportResult) {
+    // Refresh after a short delay so DB writes settle
+    setTimeout(() => {
+      loadProjects()
+    }, 300)
+  }
+
+  function handlePreviewReady(_rows: PlanningCsvRow[]) {
+    // Preview is shown inside the modal; no-op here
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="flex flex-col gap-4 p-4 min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900 tracking-tight">QA Workload</h1>
+          <p className="text-xs text-gray-500 mt-0.5">{projects.length} projects loaded</p>
+        </div>
+        <button
+          onClick={() => setShowImport(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 shadow-sm transition-colors"
+        >
+          <Upload size={15} />
+          Import CSV
+        </button>
+      </div>
+
+      {/* Quick-filter chips — always visible when data loaded */}
+      {!loading && !error && (
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-xs text-gray-400 font-medium">Filter:</span>
+
+          <FilterChip
+            active={quickFilter === 'near-uat'}
+            count={urgency.nearUat}
+            label="Near UAT"
+            sublabel="≤ 5 วัน"
+            icon={<CalendarClock size={13} />}
+            color="amber"
+            onClick={() => setQuickFilter(q => q === 'near-uat' ? 'none' : 'near-uat')}
+          />
+          <FilterChip
+            active={quickFilter === 'near-golive'}
+            count={urgency.nearGoLive}
+            label="Near Go Live"
+            sublabel="≤ 5 วัน"
+            icon={<AlertCircle size={13} />}
+            color="orange"
+            onClick={() => setQuickFilter(q => q === 'near-golive' ? 'none' : 'near-golive')}
+          />
+          <FilterChip
+            active={quickFilter === 'missing-tester'}
+            count={urgency.missingTester}
+            label="Missing Tester"
+            icon={<UserX size={13} />}
+            color="red"
+            onClick={() => setQuickFilter(q => q === 'missing-tester' ? 'none' : 'missing-tester')}
+          />
+          <FilterChip
+            active={quickFilter === 'missing-estimate'}
+            count={urgency.missingEstimate}
+            label="Missing Estimate"
+            icon={<ClipboardList size={13} />}
+            color="yellow"
+            onClick={() => setQuickFilter(q => q === 'missing-estimate' ? 'none' : 'missing-estimate')}
+          />
+
+          {quickFilter !== 'none' && (
+            <button
+              onClick={() => setQuickFilter('none')}
+              className="text-xs text-gray-400 hover:text-gray-700 underline"
+            >
+              ล้าง filter
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Tab bar */}
+      <div className="flex gap-1 border-b border-gray-200">
+        <TabButton
+          active={tab === 'table'}
+          onClick={() => setTab('table')}
+          icon={<LayoutList size={14} />}
+          label="Planning Table"
+        />
+        <TabButton
+          active={tab === 'workload'}
+          onClick={() => setTab('workload')}
+          icon={<Users size={14} />}
+          label="Tester Workload"
+        />
+      </div>
+
+      {/* Filters */}
+      <PlanningFilters
+        projects={projects}
+        filters={filters}
+        onChange={setFilters}
+        onClear={() => setFilters(EMPTY_FILTERS)}
+      />
+
+      {/* Loading state */}
+      {loading && (
+        <div className="flex items-center justify-center py-24 gap-3 text-gray-500">
+          <Loader2 size={22} className="animate-spin text-blue-500" />
+          <span className="text-sm">Loading planning data…</span>
+        </div>
+      )}
+
+      {/* Error state */}
+      {!loading && error && (
+        <div className="flex items-start gap-3 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700">
+          <AlertCircle size={18} className="shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-sm">Failed to load data</p>
+            <p className="text-xs mt-1">{error}</p>
+            <button
+              onClick={loadProjects}
+              className="mt-2 text-xs underline hover:no-underline"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Content */}
+      {!loading && !error && (
+        <>
+          {tab === 'table' && (
+            <PlanningTable
+              rows={filteredRows}
+              sort={sort}
+              onSort={handleSort}
+              onAssignTester={handleAssignTester}
+              today={today}
+            />
+          )}
+          {tab === 'workload' && (
+            <TesterGanttView
+              projects={ganttRows}
+              holidays={holidaySet}
+              employees={employees}
+              today={today}
+            />
+          )}
+        </>
+      )}
+
+      {/* Import Modal */}
+      {showImport && (
+        <Modal title="Import CSV" onClose={() => setShowImport(false)}>
+          <PlanningCsvImport
+            existingIds={existingIds}
+            onImportComplete={result => {
+              handleImportComplete(result)
+              // Keep modal open to show result step
+            }}
+            onPreviewReady={handlePreviewReady}
+          />
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
+function TabButton({
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: React.ReactNode
+  label: string
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+        active
+          ? 'border-blue-600 text-blue-700 bg-blue-50/60'
+          : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100/60'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  )
+}
+
+const URGENCY_COLORS: Record<string, { wrap: string; dot: string }> = {
+  red: { wrap: 'bg-red-50 border-red-200 text-red-700', dot: 'bg-red-500' },
+  amber: { wrap: 'bg-amber-50 border-amber-200 text-amber-700', dot: 'bg-amber-500' },
+  orange: { wrap: 'bg-orange-50 border-orange-200 text-orange-700', dot: 'bg-orange-500' },
+  yellow: { wrap: 'bg-yellow-50 border-yellow-200 text-yellow-700', dot: 'bg-yellow-500' },
+}
+
+function FilterChip({
+  active, count, label, sublabel, icon, color, onClick,
+}: {
+  active: boolean
+  count: number
+  label: string
+  sublabel?: string
+  icon: React.ReactNode
+  color: string
+  onClick: () => void
+}) {
+  const c = URGENCY_COLORS[color] ?? URGENCY_COLORS.red
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-all ${
+        active
+          ? `${c.wrap} ring-2 ring-offset-1 ring-current shadow-sm`
+          : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400'
+      }`}
+    >
+      {icon}
+      {label}
+      {sublabel && <span className="opacity-60">{sublabel}</span>}
+      <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+        active ? 'bg-white/40' : 'bg-gray-100 text-gray-700'
+      }`}>
+        {count}
+      </span>
+    </button>
+  )
+}
