@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowUp, ArrowDown, AlertTriangle } from 'lucide-react'
 import type { PlanningProject, PlanningSortField, PlanningSortState } from '../../types/planning'
 import { getUrgencyFlags } from '../../types/planning'
+import type { Employee } from '../../types/index'
 
 interface Props {
   rows: PlanningProject[]
@@ -10,6 +11,8 @@ interface Props {
   onAssignTester: (id: string, tester: string) => void
   onUpdateTestingPercent: (id: string, value: number | null) => void
   onUpdateEstimateDay: (id: string, value: number | null) => void
+  employees: Employee[]
+  pendingEditIds: Set<string>
   today: Date
 }
 
@@ -75,57 +78,123 @@ const COLUMNS: ColDef[] = [
   { label: 'Epic No.' },
 ]
 
-// Inline-edit tester cell
+// ── Tester dropdown cell ───────────────────────────────────────────────────────
+
 function TesterCell({
   row,
   onAssignTester,
   hasMissingTester,
+  employees,
 }: {
   row: PlanningProject
   onAssignTester: (id: string, tester: string) => void
   hasMissingTester: boolean
+  employees: Employee[]
 }) {
-  const [editing, setEditing] = useState(false)
-  const [val, setVal] = useState(row.tester)
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
-  if (editing) {
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setSearch('')
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [open])
+
+  // Focus search input when opened
+  useEffect(() => {
+    if (open) inputRef.current?.focus()
+  }, [open])
+
+  const activeEmployees = employees.filter(e => e.isActive)
+  const filtered = activeEmployees.filter(e => {
+    const fullName = `${e.firstName} ${e.lastName}`.toLowerCase()
+    const nick = (e.nickname ?? '').toLowerCase()
+    const q = search.toLowerCase()
+    return fullName.includes(q) || nick.includes(q)
+  })
+
+  function select(name: string) {
+    onAssignTester(row.id, name)
+    setOpen(false)
+    setSearch('')
+  }
+
+  if (!open) {
     return (
-      <input
-        autoFocus
-        type="text"
-        value={val}
-        onChange={e => setVal(e.target.value)}
-        onBlur={() => {
-          onAssignTester(row.id, val.trim())
-          setEditing(false)
-        }}
-        onKeyDown={e => {
-          if (e.key === 'Enter') {
-            onAssignTester(row.id, val.trim())
-            setEditing(false)
-          }
-          if (e.key === 'Escape') setEditing(false)
-        }}
-        className="w-28 border border-blue-400 rounded px-1 py-0.5 text-xs focus:outline-none dark:bg-slate-700 dark:text-slate-200"
-      />
+      <span
+        onClick={() => setOpen(true)}
+        className={`cursor-pointer flex items-center gap-1 whitespace-nowrap rounded px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-slate-600 ${
+          hasMissingTester ? 'text-red-600' : 'text-gray-700 dark:text-slate-200'
+        }`}
+        title="Click to assign tester"
+      >
+        {hasMissingTester && <AlertTriangle size={12} className="text-red-500 shrink-0" />}
+        {row.tester || <span className="text-red-400 italic">Unassigned</span>}
+      </span>
     )
   }
 
   return (
-    <span
-      onClick={() => setEditing(true)}
-      className={`cursor-pointer flex items-center gap-1 whitespace-nowrap rounded px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-slate-600 ${
-        hasMissingTester ? 'text-red-600' : 'text-gray-700 dark:text-slate-200'
-      }`}
-      title="Click to assign tester"
-    >
-      {hasMissingTester && <AlertTriangle size={12} className="text-red-500 shrink-0" />}
-      {row.tester || <span className="text-red-400 italic">Unassigned</span>}
-    </span>
+    <div ref={containerRef} className="relative z-20 min-w-[180px]">
+      <input
+        ref={inputRef}
+        type="text"
+        value={search}
+        placeholder="ค้นหาชื่อ…"
+        onChange={e => setSearch(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Escape') { setOpen(false); setSearch('') }
+          if (e.key === 'Enter' && filtered.length === 1) {
+            select(`${filtered[0].firstName} ${filtered[0].lastName}`)
+          }
+        }}
+        className="w-full border border-blue-400 rounded px-2 py-1 text-xs focus:outline-none dark:bg-slate-700 dark:text-slate-200"
+      />
+      <div className="absolute top-full left-0 mt-0.5 w-full min-w-[200px] max-h-48 overflow-y-auto bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded shadow-lg z-30">
+        {/* Clear/Unassign option */}
+        <button
+          onClick={() => select('')}
+          className="w-full text-left px-3 py-1.5 text-xs text-gray-400 dark:text-slate-500 italic hover:bg-gray-50 dark:hover:bg-slate-700 border-b border-gray-100 dark:border-slate-700"
+        >
+          — ไม่ระบุ (Unassigned)
+        </button>
+        {filtered.length === 0 ? (
+          <div className="px-3 py-2 text-xs text-gray-400 dark:text-slate-500">ไม่พบพนักงาน</div>
+        ) : (
+          filtered.map(e => {
+            const fullName = `${e.firstName} ${e.lastName}`
+            return (
+              <button
+                key={e.id}
+                onClick={() => select(fullName)}
+                className={`w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors ${
+                  row.tester === fullName ? 'bg-blue-50 dark:bg-blue-900/30 font-semibold text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-slate-200'
+                }`}
+              >
+                <span>{fullName}</span>
+                {e.nickname && (
+                  <span className="ml-1.5 text-gray-400 dark:text-slate-500">({e.nickname})</span>
+                )}
+              </button>
+            )
+          })
+        )}
+      </div>
+    </div>
   )
 }
 
-// Inline-edit testing percent cell
+// ── Inline-edit testing percent cell ──────────────────────────────────────────
+
 function TestingPercentCell({
   row,
   onUpdateTestingPercent,
@@ -194,7 +263,8 @@ function TestingPercentCell({
   )
 }
 
-// Inline-edit estimate day cell
+// ── Inline-edit estimate day cell ──────────────────────────────────────────────
+
 function EstimateDayCell({
   row,
   onUpdateEstimateDay,
@@ -254,7 +324,11 @@ function EstimateDayCell({
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
-export function PlanningTable({ rows, sort, onSort, onAssignTester, onUpdateTestingPercent, onUpdateEstimateDay, today }: Props) {
+export function PlanningTable({
+  rows, sort, onSort, onAssignTester,
+  onUpdateTestingPercent, onUpdateEstimateDay,
+  employees, pendingEditIds, today,
+}: Props) {
   function SortIcon({ field }: { field: PlanningSortField }) {
     if (sort.field !== field) return <span className="text-gray-300 dark:text-slate-600 ml-1">↕</span>
     return sort.dir === 'asc'
@@ -303,15 +377,21 @@ export function PlanningTable({ rows, sort, onSort, onAssignTester, onUpdateTest
             const isGoLiveNear = flags.includes('golive-near')
             const isMissingTester = flags.includes('missing-tester')
             const isMissingEstimate = flags.includes('missing-estimate')
+            const isPending = pendingEditIds.has(row.id)
 
             // Row background priority: critical > golive-near > uat-near > missing-tester
             let rowBg = ''
             if (isMissingTester) rowBg = 'bg-red-100 dark:bg-red-900/25'
             if (isUatNear)       rowBg = 'bg-amber-100 dark:bg-amber-900/25'
             if (isGoLiveNear)    rowBg = 'bg-orange-100 dark:bg-orange-900/25'
-            // critical-priority uses left border, not bg override
+            // pending edit overrides all backgrounds
+            if (isPending)       rowBg = 'bg-yellow-50 dark:bg-yellow-900/20'
 
-            const leftBorder = isCritical ? 'border-l-4 border-l-red-600' : 'border-l-4 border-l-transparent'
+            const leftBorder = isPending
+              ? 'border-l-4 border-l-yellow-400'
+              : isCritical
+              ? 'border-l-4 border-l-red-600'
+              : 'border-l-4 border-l-transparent'
 
             const testDatePast = isPast(row.testDate, today)
             const uatNearHighlight = isWithin7Days(row.uatDate, today)
@@ -327,6 +407,9 @@ export function PlanningTable({ rows, sort, onSort, onAssignTester, onUpdateTest
                   className={`${tdBase} sticky left-0 z-10 font-mono text-xs text-blue-700 dark:text-blue-300 whitespace-nowrap shadow-[2px_0_4px_-1px_rgba(0,0,0,0.07)] ${rowBg || 'bg-white dark:bg-slate-800'}`}
                 >
                   {row.id}
+                  {isPending && (
+                    <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-yellow-400 align-middle" title="มีการแก้ไขที่ยังไม่บันทึก" />
+                  )}
                 </td>
 
                 {/* Iteration */}
@@ -334,12 +417,7 @@ export function PlanningTable({ rows, sort, onSort, onAssignTester, onUpdateTest
 
                 {/* Project Name */}
                 <td className={`${tdBase} max-w-[180px]`}>
-                  <span
-                    className="block truncate"
-                    title={row.projectName}
-                  >
-                    {row.projectName}
-                  </span>
+                  <span className="block truncate" title={row.projectName}>{row.projectName}</span>
                 </td>
 
                 {/* Item Type */}
@@ -384,6 +462,7 @@ export function PlanningTable({ rows, sort, onSort, onAssignTester, onUpdateTest
                     row={row}
                     onAssignTester={onAssignTester}
                     hasMissingTester={isMissingTester}
+                    employees={employees}
                   />
                 </td>
 

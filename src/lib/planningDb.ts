@@ -133,4 +133,11 @@ export const planningDb = {
       .from('planning_projects').update({ [field]: value }).eq('id', id)
     throwIf(error, 'updateField')
   },
+
+  async updateFields(id: string, fields: Record<string, unknown>): Promise<void> {
+    if (!isConfigured || Object.keys(fields).length === 0) return
+    const { error } = await (supabase as any)
+      .from('planning_projects').update(fields).eq('id', id)
+    throwIf(error, 'updateFields')
+  },
 }
