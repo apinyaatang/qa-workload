@@ -177,9 +177,9 @@ export function PlanningTable({ rows, sort, onSort, onAssignTester, today }: Pro
 
             // Row background priority: critical > golive-near > uat-near > missing-tester
             let rowBg = ''
-            if (isMissingTester) rowBg = 'bg-red-50 dark:bg-red-900/20'
-            if (isUatNear) rowBg = 'bg-yellow-50 dark:bg-yellow-900/20'
-            if (isGoLiveNear) rowBg = 'bg-orange-50'
+            if (isMissingTester) rowBg = 'bg-red-100 dark:bg-red-900/25'
+            if (isUatNear)       rowBg = 'bg-amber-100 dark:bg-amber-900/25'
+            if (isGoLiveNear)    rowBg = 'bg-orange-100 dark:bg-orange-900/25'
             // critical-priority uses left border, not bg override
 
             const leftBorder = isCritical ? 'border-l-4 border-l-red-600' : 'border-l-4 border-l-transparent'
@@ -195,7 +195,7 @@ export function PlanningTable({ rows, sort, onSort, onAssignTester, today }: Pro
 
                 {/* ID — sticky */}
                 <td
-                  className={`${tdBase} sticky left-0 z-10 bg-white dark:bg-slate-800 font-mono text-xs text-blue-700 dark:text-blue-300 whitespace-nowrap shadow-[2px_0_4px_-1px_rgba(0,0,0,0.07)] ${rowBg}`}
+                  className={`${tdBase} sticky left-0 z-10 font-mono text-xs text-blue-700 dark:text-blue-300 whitespace-nowrap shadow-[2px_0_4px_-1px_rgba(0,0,0,0.07)] ${rowBg || 'bg-white dark:bg-slate-800'}`}
                 >
                   {row.id}
                 </td>
