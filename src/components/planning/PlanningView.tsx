@@ -18,6 +18,7 @@ import { PlanningTable } from './PlanningTable'
 import TesterGanttView from './TesterGanttView'
 import { PlanningCsvImport } from './PlanningCsvImport'
 import { useApp } from '../../context/AppContext'
+import { calcTestDate } from '../../utils/planningCsvParser'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -267,14 +268,34 @@ export default function PlanningView() {
   // ── Assign tester (inline edit) ──────────────────────────────────────────────
 
   async function handleAssignTester(id: string, tester: string) {
-    // Optimistic update
-    setProjects(prev =>
-      prev.map(p => (p.id === id ? { ...p, tester } : p))
-    )
+    setProjects(prev => prev.map(p => (p.id === id ? { ...p, tester } : p)))
     try {
       await planningDb.updateField(id, 'tester', tester)
     } catch {
-      // Roll back
+      await loadProjects()
+    }
+  }
+
+  async function handleUpdateTestingPercent(id: string, value: number | null) {
+    setProjects(prev => prev.map(p => (p.id === id ? { ...p, testingPercent: value } : p)))
+    try {
+      await planningDb.updateField(id, 'testing_percent', value)
+    } catch {
+      await loadProjects()
+    }
+  }
+
+  async function handleUpdateEstimateDay(id: string, value: number | null) {
+    const project = projects.find(p => p.id === id)
+    if (!project) return
+    const newTestDate = calcTestDate(project.uatDate, project.goLiveDate, value, holidaySet)
+    setProjects(prev =>
+      prev.map(p => (p.id === id ? { ...p, testEstimateDay: value, testDate: newTestDate } : p))
+    )
+    try {
+      await planningDb.updateField(id, 'test_estimate_day', value)
+      await planningDb.updateField(id, 'test_date', newTestDate)
+    } catch {
       await loadProjects()
     }
   }
@@ -306,13 +327,6 @@ export default function PlanningView() {
   // ── Urgency summary — always from full base (not filtered) ───────────────────
 
   const urgency = useMemo(() => getUrgencyCounts(baseFiltered, today), [baseFiltered, today])
-
-  // ── Existing IDs set for import ──────────────────────────────────────────────
-
-  const existingIds = useMemo(
-    () => new Set(projects.map(p => p.id)),
-    [projects]
-  )
 
   // ── Import callbacks ─────────────────────────────────────────────────────────
 
@@ -455,6 +469,8 @@ export default function PlanningView() {
               sort={sort}
               onSort={handleSort}
               onAssignTester={handleAssignTester}
+              onUpdateTestingPercent={handleUpdateTestingPercent}
+              onUpdateEstimateDay={handleUpdateEstimateDay}
               today={today}
             />
           )}
@@ -473,7 +489,7 @@ export default function PlanningView() {
       {showImport && (
         <Modal title="Import CSV" onClose={() => setShowImport(false)}>
           <PlanningCsvImport
-            existingIds={existingIds}
+            existingProjects={projects}
             onImportComplete={result => {
               handleImportComplete(result)
               // Keep modal open to show result step
