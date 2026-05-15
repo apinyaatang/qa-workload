@@ -189,13 +189,13 @@ function applyQuickFilter(rows: PlanningProject[], qf: QuickFilter, today: Date)
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-12 px-4 pb-4 overflow-y-auto">
-      <div className="relative w-full max-w-4xl bg-white rounded-xl shadow-2xl">
+      <div className="relative w-full max-w-4xl bg-white dark:bg-slate-800 rounded-xl shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-base font-semibold text-gray-800">{title}</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-600">
+          <h2 className="text-base font-semibold text-gray-800 dark:text-slate-100">{title}</h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded hover:bg-gray-100 text-gray-500 transition-colors"
+            className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-slate-600 text-gray-500 dark:text-slate-400 transition-colors"
           >
             <X size={18} />
           </button>
@@ -330,12 +330,12 @@ export default function PlanningView() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col gap-4 p-4 min-h-screen bg-gray-50">
+    <div className="flex flex-col gap-4 p-4 min-h-screen bg-gray-50 dark:bg-slate-900">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 tracking-tight">QA Workload</h1>
-          <p className="text-xs text-gray-500 mt-0.5">{projects.length} projects loaded</p>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">QA Workload</h1>
+          <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{projects.length} projects loaded</p>
         </div>
         <button
           onClick={() => setShowImport(true)}
@@ -349,7 +349,7 @@ export default function PlanningView() {
       {/* Quick-filter chips — always visible when data loaded */}
       {!loading && !error && (
         <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-xs text-gray-400 font-medium">Filter:</span>
+          <span className="text-xs text-gray-400 dark:text-slate-500 font-medium">Filter:</span>
 
           <FilterChip
             active={quickFilter === 'near-uat'}
@@ -389,7 +389,7 @@ export default function PlanningView() {
           {quickFilter !== 'none' && (
             <button
               onClick={() => setQuickFilter('none')}
-              className="text-xs text-gray-400 hover:text-gray-700 underline"
+              className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 underline"
             >
               ล้าง filter
             </button>
@@ -398,7 +398,7 @@ export default function PlanningView() {
       )}
 
       {/* Tab bar */}
-      <div className="flex gap-1 border-b border-gray-200">
+      <div className="flex gap-1 border-b border-gray-200 dark:border-slate-600">
         <TabButton
           active={tab === 'table'}
           onClick={() => setTab('table')}
@@ -423,7 +423,7 @@ export default function PlanningView() {
 
       {/* Loading state */}
       {loading && (
-        <div className="flex items-center justify-center py-24 gap-3 text-gray-500">
+        <div className="flex items-center justify-center py-24 gap-3 text-gray-500 dark:text-slate-400">
           <Loader2 size={22} className="animate-spin text-blue-500" />
           <span className="text-sm">Loading planning data…</span>
         </div>
@@ -431,7 +431,7 @@ export default function PlanningView() {
 
       {/* Error state */}
       {!loading && error && (
-        <div className="flex items-start gap-3 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700">
+        <div className="flex items-start gap-3 p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300">
           <AlertCircle size={18} className="shrink-0 mt-0.5" />
           <div>
             <p className="font-semibold text-sm">Failed to load data</p>
@@ -504,8 +504,8 @@ function TabButton({
       onClick={onClick}
       className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
         active
-          ? 'border-blue-600 text-blue-700 bg-blue-50/60'
-          : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100/60'
+          ? 'border-blue-600 text-blue-700 dark:text-blue-300 bg-blue-50/60 dark:bg-blue-900/20'
+          : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-100/60 dark:hover:bg-slate-700'
       }`}
     >
       {icon}
@@ -515,10 +515,10 @@ function TabButton({
 }
 
 const URGENCY_COLORS: Record<string, { wrap: string; dot: string }> = {
-  red: { wrap: 'bg-red-50 border-red-200 text-red-700', dot: 'bg-red-500' },
-  amber: { wrap: 'bg-amber-50 border-amber-200 text-amber-700', dot: 'bg-amber-500' },
-  orange: { wrap: 'bg-orange-50 border-orange-200 text-orange-700', dot: 'bg-orange-500' },
-  yellow: { wrap: 'bg-yellow-50 border-yellow-200 text-yellow-700', dot: 'bg-yellow-500' },
+  red: { wrap: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300', dot: 'bg-red-500' },
+  amber: { wrap: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
+  orange: { wrap: 'bg-orange-50 border-orange-200 text-orange-700 dark:text-orange-300', dot: 'bg-orange-500' },
+  yellow: { wrap: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 text-yellow-700 dark:text-yellow-300', dot: 'bg-yellow-500' },
 }
 
 function FilterChip({
@@ -539,14 +539,14 @@ function FilterChip({
       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-all ${
         active
           ? `${c.wrap} ring-2 ring-offset-1 ring-current shadow-sm`
-          : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400'
+          : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:border-gray-400'
       }`}
     >
       {icon}
       {label}
       {sublabel && <span className="opacity-60">{sublabel}</span>}
       <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-        active ? 'bg-white/40' : 'bg-gray-100 text-gray-700'
+        active ? 'bg-white/40' : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-200'
       }`}>
         {count}
       </span>

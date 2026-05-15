@@ -250,27 +250,27 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
 
   if (projects.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center text-gray-400">
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm p-12 text-center text-gray-400 dark:text-slate-500">
         ไม่มีข้อมูล Project — Import CSV หรือเพิ่มข้อมูลก่อน
       </div>
     )
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+    <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
       {/* Outer scroll wrapper */}
       <div className="flex overflow-hidden" style={{ minHeight: 200 }}>
         {/* ── Sticky left panel ── */}
         <div
-          className="shrink-0 border-r border-gray-200 bg-white z-20"
+          className="shrink-0 border-r border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 z-20"
           style={{ width: LEFT_W }}
         >
           {/* Header filler matching date headers */}
           <div
-            className="border-b border-gray-200 bg-gray-50 flex items-end px-3 pb-1"
+            className="border-b border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 flex items-end px-3 pb-1"
             style={{ height: HEAD_H }}
           >
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            <span className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">
               Tester / Project
             </span>
           </div>
@@ -279,13 +279,13 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
           {groups.map(group => (
             <div key={group.name}>
               {/* Group header */}
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border-b border-gray-100 sticky top-0 z-10">
-                <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-                  <span className="text-[9px] font-bold text-indigo-600">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-700/50 border-b border-gray-100 dark:border-slate-700 sticky top-0 z-10">
+                <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center shrink-0">
+                  <span className="text-[9px] font-bold text-indigo-600 dark:text-indigo-300">
                     {group.name[0]?.toUpperCase() ?? '?'}
                   </span>
                 </div>
-                <p className="text-xs font-semibold text-gray-800 truncate flex-1">{group.name}</p>
+                <p className="text-xs font-semibold text-gray-800 dark:text-slate-100 truncate flex-1">{group.name}</p>
                 {/* Workload status badge */}
                 {(() => {
                   const wl = testerWorkloads.get(group.name)
@@ -298,7 +298,7 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
                     </span>
                   )
                 })()}
-                <span className="text-[10px] text-gray-400 shrink-0">
+                <span className="text-[10px] text-gray-400 dark:text-slate-500 shrink-0">
                   {group.totalEstimate.toFixed(1)}d
                 </span>
               </div>
@@ -307,7 +307,7 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
               {group.rows.map(({ project: p }) => (
                 <div
                   key={p.id}
-                  className="flex items-center gap-2 px-3 border-b border-gray-50 hover:bg-blue-50/40 transition-colors"
+                  className="flex items-center gap-2 px-3 border-b border-gray-50 dark:border-slate-700 hover:bg-blue-50/40 dark:hover:bg-slate-700/50 transition-colors"
                   style={{ height: ROW_H }}
                 >
                   {/* Priority dot */}
@@ -316,11 +316,11 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
                     style={{ background: priorityColor(p.priority) }}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-gray-800 truncate leading-tight">
+                    <p className="text-xs font-medium text-gray-800 dark:text-slate-100 truncate leading-tight">
                       {p.projectName}
                     </p>
                     {p.feature && (
-                      <p className="text-[10px] text-gray-400 truncate leading-tight">{p.feature}</p>
+                      <p className="text-[10px] text-gray-400 dark:text-slate-500 truncate leading-tight">{p.feature}</p>
                     )}
                   </div>
                 </div>
@@ -333,11 +333,11 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
         <div ref={scrollRef} className="flex-1 overflow-x-auto overflow-y-auto">
           <div style={{ width: totalW, minWidth: totalW }}>
             {/* Month header */}
-            <div className="flex border-b border-gray-200 bg-gray-50 sticky top-0 z-10" style={{ height: 28 }}>
+            <div className="flex border-b border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 sticky top-0 z-10" style={{ height: 28 }}>
               {monthSpans.map((span, i) => (
                 <div
                   key={i}
-                  className="border-r border-gray-200 flex items-center justify-center text-[10px] font-semibold text-gray-600 overflow-hidden"
+                  className="border-r border-gray-200 dark:border-slate-600 flex items-center justify-center text-[10px] font-semibold text-gray-600 dark:text-slate-300 overflow-hidden"
                   style={{ width: span.count * COL_W }}
                 >
                   {span.label}
@@ -346,15 +346,15 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
             </div>
 
             {/* Day header */}
-            <div className="flex border-b border-gray-200 bg-gray-50 sticky top-7 z-10" style={{ height: HEAD_H - 28 }}>
+            <div className="flex border-b border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 sticky top-7 z-10" style={{ height: HEAD_H - 28 }}>
               {workingDays.map(iso => {
                 const isToday = iso === todayIso
                 const dayNum  = iso.slice(8)
                 return (
                   <div
                     key={iso}
-                    className={`border-r border-gray-100 flex items-center justify-center text-[10px] shrink-0 ${
-                      isToday ? 'bg-blue-100 font-bold text-blue-700' : 'text-gray-400'
+                    className={`border-r border-gray-100 dark:border-slate-700 flex items-center justify-center text-[10px] shrink-0 ${
+                      isToday ? 'bg-blue-100 dark:bg-blue-900/30 font-bold text-blue-700 dark:text-blue-300' : 'text-gray-400 dark:text-slate-500'
                     }`}
                     style={{ width: COL_W }}
                   >
@@ -367,7 +367,7 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
             {/* Today highlight column (full height) */}
             {colIndex(todayIso) >= 0 && (
               <div
-                className="absolute top-0 bottom-0 bg-blue-50/60 pointer-events-none z-0"
+                className="absolute top-0 bottom-0 bg-blue-50/60 dark:bg-blue-900/20 pointer-events-none z-0"
                 style={{
                   left: LEFT_W + colIndex(todayIso) * COL_W,
                   width: COL_W,
@@ -380,7 +380,7 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
               <div key={group.name}>
                 {/* Group header spacer + heatmap row */}
                 <div
-                  className="border-b border-gray-200 bg-slate-50 flex items-end"
+                  className="border-b border-gray-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 flex items-end"
                   style={{ height: 32 }}
                 >
                   {/* Heatmap: 1 cell per working day */}
@@ -408,14 +408,14 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
                 {group.rows.map(({ project: p, bars }) => (
                   <div
                     key={p.id}
-                    className="relative border-b border-gray-50 hover:bg-blue-50/20"
+                    className="relative border-b border-gray-50 dark:border-slate-700 hover:bg-blue-50/20 dark:hover:bg-slate-700/50"
                     style={{ height: ROW_H }}
                   >
                     {/* Column background stripes for weekdays */}
                     {workingDays.map((iso, ci) => (
                       <div
                         key={iso}
-                        className={`absolute top-0 bottom-0 ${iso === todayIso ? 'bg-blue-50/50' : ''}`}
+                        className={`absolute top-0 bottom-0 ${iso === todayIso ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}`}
                         style={{ left: ci * COL_W, width: COL_W }}
                       />
                     ))}
@@ -479,12 +479,12 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
       </div>
 
       {/* ── Workload legend ── */}
-      <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 flex flex-wrap gap-x-4 gap-y-1 items-center">
-        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mr-1">Workload:</span>
+      <div className="px-4 py-2 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50 flex flex-wrap gap-x-4 gap-y-1 items-center">
+        <span className="text-[10px] font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wide mr-1">Workload:</span>
         {(Object.keys(WORKLOAD_COLORS) as QaWorkloadStatus[]).map(status => {
           const c = WORKLOAD_COLORS[status]
           return (
-            <span key={status} className="flex items-center gap-1 text-xs text-gray-600">
+            <span key={status} className="flex items-center gap-1 text-xs text-gray-600 dark:text-slate-300">
               <span className="w-3 h-3 rounded-sm inline-block" style={{ background: c.heatBg, border: '1px solid rgba(0,0,0,0.1)' }} />
               {c.label}
             </span>
@@ -493,9 +493,9 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
       </div>
 
       {/* ── Bar Legend ── */}
-      <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 flex flex-wrap gap-x-4 gap-y-1">
+      <div className="px-4 py-2 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50 flex flex-wrap gap-x-4 gap-y-1">
         {(Object.keys(COLORS) as (keyof typeof COLORS)[]).map(key => (
-          <span key={key} className="flex items-center gap-1.5 text-xs text-gray-600">
+          <span key={key} className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-slate-300">
             <span
               className="w-5 h-3.5 rounded-sm inline-flex items-center justify-center"
               style={{ background: COLORS[key].bg, border: `1px solid ${COLORS[key].border}` }}

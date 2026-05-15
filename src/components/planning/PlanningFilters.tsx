@@ -55,7 +55,7 @@ function MultiSelect({ label, options, selected, onChange, placeholder = 'All' }
 
   return (
     <div className="flex flex-col gap-1" ref={ref}>
-      <label className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+      <label className="text-[11px] font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wide">
         {label}
         {hasValue && (
           <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-blue-600 text-white text-[10px] font-bold">
@@ -70,48 +70,48 @@ function MultiSelect({ label, options, selected, onChange, placeholder = 'All' }
         onClick={() => setOpen(o => !o)}
         className={`h-8 min-w-[120px] max-w-[180px] flex items-center justify-between gap-1 px-2 rounded border text-sm cursor-pointer transition-colors
           ${hasValue
-            ? 'border-blue-500 bg-blue-50 text-blue-700'
-            : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+            : 'border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-200 hover:border-gray-400'
           }`}
       >
         <span className="truncate text-left flex-1">{displayText}</span>
         {hasValue
           ? <X size={12} className="shrink-0 text-blue-500" onClick={clear} />
-          : <ChevronDown size={12} className="shrink-0 text-gray-400" />
+          : <ChevronDown size={12} className="shrink-0 text-gray-400 dark:text-slate-500" />
         }
       </button>
 
       {/* Dropdown panel */}
       {open && (
-        <div className="absolute z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl min-w-[200px] max-w-[260px]"
+        <div className="absolute z-50 mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg shadow-xl min-w-[200px] max-w-[260px]"
           style={{ marginTop: 36 }}>
           {/* Search input */}
-          <div className="p-2 border-b border-gray-100">
+          <div className="p-2 border-b border-gray-100 dark:border-slate-700">
             <div className="relative">
-              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" />
               <input
                 autoFocus
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder={`ค้นหา ${label}…`}
-                className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded outline-none focus:border-blue-400"
+                className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 dark:border-slate-600 rounded outline-none focus:border-blue-400 bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-200 dark:placeholder-slate-400"
               />
             </div>
           </div>
 
           {/* Select all / clear */}
           {options.length > 0 && (
-            <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-50 text-xs">
+            <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-50 dark:border-slate-700 text-xs">
               <button
                 onClick={() => onChange(options)}
-                className="text-blue-600 hover:underline"
+                className="text-blue-600 dark:text-blue-400 hover:underline"
               >
                 เลือกทั้งหมด
               </button>
               <button
                 onClick={() => onChange([])}
                 disabled={selected.length === 0}
-                className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 disabled:opacity-30"
               >
                 ล้าง
               </button>
@@ -121,7 +121,7 @@ function MultiSelect({ label, options, selected, onChange, placeholder = 'All' }
           {/* Options list */}
           <ul className="max-h-48 overflow-y-auto py-1">
             {filtered.length === 0 ? (
-              <li className="px-3 py-2 text-xs text-gray-400">ไม่พบผลลัพธ์</li>
+              <li className="px-3 py-2 text-xs text-gray-400 dark:text-slate-500">ไม่พบผลลัพธ์</li>
             ) : (
               filtered.map(opt => (
                 <li key={opt}>
@@ -129,14 +129,14 @@ function MultiSelect({ label, options, selected, onChange, placeholder = 'All' }
                     onClick={() => toggle(opt)}
                     className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left transition-colors
                       ${selected.includes(opt)
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-gray-700 hover:bg-gray-50'
+                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                        : 'text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700'
                       }`}
                   >
                     <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors
                       ${selected.includes(opt)
                         ? 'bg-blue-600 border-blue-600'
-                        : 'border-gray-300'
+                        : 'border-gray-300 dark:border-slate-600'
                       }`}>
                       {selected.includes(opt) && <Check size={10} className="text-white" strokeWidth={3} />}
                     </span>
@@ -194,16 +194,16 @@ export function PlanningFilters({ projects, filters, onChange, onClear }: Props)
   }
 
   const inputBase =
-    'h-8 rounded border border-gray-300 bg-white px-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
+    'h-8 rounded border border-gray-300 dark:border-slate-500 bg-white dark:bg-slate-700 px-2 text-sm text-gray-700 dark:text-slate-200 dark:placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
   const selectBase =
-    'h-8 rounded border border-gray-300 bg-white px-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer'
+    'h-8 rounded border border-gray-300 dark:border-slate-500 bg-white dark:bg-slate-700 px-2 text-sm text-gray-700 dark:text-slate-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer'
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+    <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg p-3 shadow-sm">
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">
-        <SlidersHorizontal size={15} className="text-gray-500 shrink-0" />
-        <span className="text-sm font-medium text-gray-700">Filters</span>
+        <SlidersHorizontal size={15} className="text-gray-500 dark:text-slate-400 shrink-0" />
+        <span className="text-sm font-medium text-gray-700 dark:text-slate-200">Filters</span>
         {activeCount > 0 && (
           <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-blue-600 text-white text-[11px] font-bold">
             {activeCount}
@@ -213,7 +213,7 @@ export function PlanningFilters({ projects, filters, onChange, onClear }: Props)
           <button
             onClick={onClear}
             disabled={activeCount === 0}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1 text-xs rounded border border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <X size={12} />
             Clear all
@@ -225,9 +225,9 @@ export function PlanningFilters({ projects, filters, onChange, onClear }: Props)
       <div className="flex flex-wrap gap-2 items-end relative">
         {/* Search */}
         <div className="flex flex-col gap-1 min-w-[180px] flex-1">
-          <label className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">Search</label>
+          <label className="text-[11px] font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wide">Search</label>
           <div className="relative">
-            <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 pointer-events-none" />
             <input
               type="text"
               placeholder="Project, feature, tester…"
@@ -248,7 +248,7 @@ export function PlanningFilters({ projects, filters, onChange, onClear }: Props)
 
         {/* Priority — single select */}
         <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">Priority</label>
+          <label className="text-[11px] font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wide">Priority</label>
           <select
             value={filters.priority}
             onChange={e => set('priority', e.target.value)}
@@ -285,28 +285,28 @@ export function PlanningFilters({ projects, filters, onChange, onClear }: Props)
 
         {/* UAT Date range */}
         <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">UAT Date From</label>
+          <label className="text-[11px] font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wide">UAT Date From</label>
           <input type="date" value={filters.uatDateFrom} onChange={e => set('uatDateFrom', e.target.value)} className={inputBase} />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">UAT Date To</label>
+          <label className="text-[11px] font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wide">UAT Date To</label>
           <input type="date" value={filters.uatDateTo} onChange={e => set('uatDateTo', e.target.value)} className={inputBase} />
         </div>
 
         {/* Go Live Date range */}
         <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">Go Live From</label>
+          <label className="text-[11px] font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wide">Go Live From</label>
           <input type="date" value={filters.goLiveDateFrom} onChange={e => set('goLiveDateFrom', e.target.value)} className={inputBase} />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">Go Live To</label>
+          <label className="text-[11px] font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wide">Go Live To</label>
           <input type="date" value={filters.goLiveDateTo} onChange={e => set('goLiveDateTo', e.target.value)} className={inputBase} />
         </div>
       </div>
 
       {/* Active filter chips */}
       {activeCount > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-gray-100">
+        <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-gray-100 dark:border-slate-700">
           {filters.iterations.map(v => (
             <Chip key={`iter-${v}`} label={`Iteration: ${v}`}
               onRemove={() => set('iterations', filters.iterations.filter(x => x !== v))} />
@@ -334,9 +334,9 @@ export function PlanningFilters({ projects, filters, onChange, onClear }: Props)
 
 function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium">
       {label}
-      <button onClick={onRemove} className="hover:text-blue-900">
+      <button onClick={onRemove} className="hover:text-blue-900 dark:hover:text-blue-100">
         <X size={10} />
       </button>
     </span>

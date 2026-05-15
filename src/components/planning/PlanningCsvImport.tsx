@@ -21,11 +21,11 @@ interface Props {
 type Step = 'upload' | 'preview' | 'result'
 
 const PRIORITY_BADGE: Record<string, string> = {
-  Critical: 'bg-red-100 text-red-700',
-  High: 'bg-orange-100 text-orange-700',
-  Medium: 'bg-yellow-100 text-yellow-700',
-  Low: 'bg-blue-100 text-blue-700',
-  '': 'bg-gray-100 text-gray-500',
+  Critical: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
+  High: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300',
+  Medium: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300',
+  Low: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
+  '': 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400',
 }
 
 function formatDate(iso: string | null | undefined): string {
@@ -158,14 +158,14 @@ export function PlanningCsvImport({ existingIds, onImportComplete, onPreviewRead
                 step === s.key
                   ? 'bg-blue-600 text-white'
                   : steps.findIndex(x => x.key === step) > i
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-gray-100 text-gray-400'
+                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                  : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-slate-500'
               }`}
             >
               {s.label}
             </div>
             {i < steps.length - 1 && (
-              <div className="w-8 h-0.5 bg-gray-200" />
+              <div className="w-8 h-0.5 bg-gray-200 dark:bg-slate-600" />
             )}
           </React.Fragment>
         ))}
@@ -178,8 +178,8 @@ export function PlanningCsvImport({ existingIds, onImportComplete, onPreviewRead
           <div
             className={`relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed py-14 px-8 cursor-pointer transition-colors ${
               dragging
-                ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30'
+                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                : 'border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700/50 hover:border-blue-400 hover:bg-blue-50/30'
             }`}
             onDrop={onDrop}
             onDragOver={onDragOver}
@@ -188,14 +188,14 @@ export function PlanningCsvImport({ existingIds, onImportComplete, onPreviewRead
           >
             <Upload
               size={36}
-              className={`${dragging ? 'text-blue-500' : 'text-gray-400'}`}
+              className={`${dragging ? 'text-blue-500' : 'text-gray-400 dark:text-slate-500'}`}
             />
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-700">
+              <p className="text-sm font-medium text-gray-700 dark:text-slate-200">
                 Drag & drop a CSV file here, or{' '}
                 <span className="text-blue-600 underline">browse</span>
               </p>
-              <p className="text-xs text-gray-400 mt-1">Accepts .csv files only</p>
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">Accepts .csv files only</p>
             </div>
             <input
               ref={fileInputRef}
@@ -221,7 +221,7 @@ export function PlanningCsvImport({ existingIds, onImportComplete, onPreviewRead
 
           {/* Parse error */}
           {parseError && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm">
               <AlertCircle size={16} className="shrink-0 mt-0.5" />
               <span>{parseError}</span>
             </div>
@@ -234,55 +234,55 @@ export function PlanningCsvImport({ existingIds, onImportComplete, onPreviewRead
         <div className="flex flex-col gap-4">
           {/* Summary */}
           <div className="flex flex-wrap gap-3 text-sm">
-            <span className="px-3 py-1 rounded-full bg-gray-100 text-gray-700">
+            <span className="px-3 py-1 rounded-full bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-200">
               Total: <strong>{rows.length}</strong>
             </span>
-            <span className="px-3 py-1 rounded-full bg-green-100 text-green-700">
+            <span className="px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300">
               Valid: <strong>{validRows.length}</strong>
             </span>
             {errorRows.length > 0 && (
-              <span className="px-3 py-1 rounded-full bg-red-100 text-red-700">
+              <span className="px-3 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
                 Errors: <strong>{errorRows.length}</strong>
               </span>
             )}
-            <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700">
+            <span className="px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
               New: <strong>{newRows.length}</strong>
             </span>
             {updateRows.length > 0 && (
-              <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700">
+              <span className="px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300">
                 Update: <strong>{updateRows.length}</strong>
               </span>
             )}
           </div>
 
           {/* Table */}
-          <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+          <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm">
             <table className="min-w-full text-xs border-collapse">
               <thead>
-                <tr className="bg-gray-50">
-                  <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap border-b">Status</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap border-b">Row</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap border-b">ID</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide border-b">Project Name</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap border-b">UAT Date</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap border-b">Est. (day)</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap border-b">Test Date</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap border-b">Status</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap border-b">Tester</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap border-b">Priority</th>
+                <tr className="bg-gray-50 dark:bg-slate-700">
+                  <th className="px-3 py-2 text-left font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide whitespace-nowrap border-b dark:border-slate-600">Status</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide whitespace-nowrap border-b dark:border-slate-600">Row</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide whitespace-nowrap border-b dark:border-slate-600">ID</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide border-b dark:border-slate-600">Project Name</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide whitespace-nowrap border-b dark:border-slate-600">UAT Date</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide whitespace-nowrap border-b dark:border-slate-600">Est. (day)</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide whitespace-nowrap border-b dark:border-slate-600">Test Date</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide whitespace-nowrap border-b dark:border-slate-600">Status</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide whitespace-nowrap border-b dark:border-slate-600">Tester</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide whitespace-nowrap border-b dark:border-slate-600">Priority</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
                 {rows.map(row => (
                   <tr
                     key={row.rowNo}
                     className={`${
                       !row.isValid
-                        ? 'bg-red-50'
+                        ? 'bg-red-50 dark:bg-red-900/20'
                         : row.willUpdate
-                        ? 'bg-amber-50/40'
-                        : 'bg-white'
-                    } hover:bg-blue-50/30 transition-colors`}
+                        ? 'bg-amber-50/40 dark:bg-amber-900/20'
+                        : 'bg-white dark:bg-slate-800'
+                    } hover:bg-blue-50/30 dark:hover:bg-slate-700/50 transition-colors`}
                   >
                     {/* Badge: NEW / UPDATE / ERROR */}
                     <td className="px-3 py-2 whitespace-nowrap">
@@ -300,23 +300,23 @@ export function PlanningCsvImport({ existingIds, onImportComplete, onPreviewRead
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-gray-400">{row.rowNo}</td>
-                    <td className="px-3 py-2 font-mono text-gray-700 whitespace-nowrap">{row.data.id || '—'}</td>
+                    <td className="px-3 py-2 text-gray-400 dark:text-slate-500">{row.rowNo}</td>
+                    <td className="px-3 py-2 font-mono text-gray-700 dark:text-slate-200 whitespace-nowrap">{row.data.id || '—'}</td>
                     <td className="px-3 py-2 max-w-[200px]">
-                      <div className="truncate" title={row.data.projectName}>{row.data.projectName || '—'}</div>
+                      <div className="truncate text-gray-700 dark:text-slate-200" title={row.data.projectName}>{row.data.projectName || '—'}</div>
                       {!row.isValid && (
-                        <div className="text-red-600 text-[10px] mt-0.5">
+                        <div className="text-red-600 dark:text-red-300 text-[10px] mt-0.5">
                           {row.errors.join(' · ')}
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-2 whitespace-nowrap">{formatDate(row.data.uatDate)}</td>
-                    <td className="px-3 py-2 whitespace-nowrap text-center">
+                    <td className="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-slate-200">{formatDate(row.data.uatDate)}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-center text-gray-700 dark:text-slate-200">
                       {row.data.testEstimateDay != null ? `${row.data.testEstimateDay}d` : '—'}
                     </td>
-                    <td className="px-3 py-2 whitespace-nowrap">{formatDate(row.data.testDate)}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">{row.data.status || '—'}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">{row.data.tester || '—'}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-slate-200">{formatDate(row.data.testDate)}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-slate-200">{row.data.status || '—'}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-slate-200">{row.data.tester || '—'}</td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       {row.data.priority ? (
                         <span
@@ -338,7 +338,7 @@ export function PlanningCsvImport({ existingIds, onImportComplete, onPreviewRead
           <div className="flex items-center gap-3 pt-1">
             <button
               onClick={() => setStep('upload')}
-              className="flex items-center gap-1.5 px-4 py-2 rounded border border-gray-300 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 rounded border border-gray-300 dark:border-slate-600 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"
             >
               <ChevronLeft size={16} />
               Back
@@ -352,7 +352,7 @@ export function PlanningCsvImport({ existingIds, onImportComplete, onPreviewRead
               Confirm Import ({validRows.length} rows)
             </button>
             {errorRows.length > 0 && (
-              <span className="text-xs text-amber-600">
+              <span className="text-xs text-amber-600 dark:text-amber-300">
                 {errorRows.length} row{errorRows.length > 1 ? 's' : ''} with errors will be skipped.
               </span>
             )}
@@ -363,7 +363,7 @@ export function PlanningCsvImport({ existingIds, onImportComplete, onPreviewRead
       {/* ── STEP 3: Result ──────────────────────────────────────────────────── */}
       {step === 'result' && result && (
         <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-2 text-green-700">
+          <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
             <CheckCircle2 size={20} className="shrink-0" />
             <span className="font-semibold text-base">Import Complete</span>
           </div>
@@ -371,10 +371,10 @@ export function PlanningCsvImport({ existingIds, onImportComplete, onPreviewRead
           {/* Summary card */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: 'Total', value: result.totalRows, color: 'bg-gray-100 text-gray-700' },
-              { label: 'Inserted', value: result.insertedRows, color: 'bg-green-100 text-green-700' },
-              { label: 'Updated', value: result.updatedRows, color: 'bg-blue-100 text-blue-700' },
-              { label: 'Failed', value: result.failedRows, color: 'bg-red-100 text-red-700' },
+              { label: 'Total', value: result.totalRows, color: 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-200' },
+              { label: 'Inserted', value: result.insertedRows, color: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300' },
+              { label: 'Updated', value: result.updatedRows, color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' },
+              { label: 'Failed', value: result.failedRows, color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' },
             ].map(item => (
               <div key={item.label} className={`rounded-lg p-4 text-center ${item.color}`}>
                 <div className="text-2xl font-bold">{item.value}</div>
@@ -385,14 +385,14 @@ export function PlanningCsvImport({ existingIds, onImportComplete, onPreviewRead
 
           {/* Error list */}
           {result.errors.length > 0 && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-              <div className="flex items-center gap-2 text-red-700 text-sm font-semibold mb-2">
+            <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3">
+              <div className="flex items-center gap-2 text-red-700 dark:text-red-300 text-sm font-semibold mb-2">
                 <AlertCircle size={14} />
                 Failed Rows
               </div>
               <ul className="space-y-1">
                 {result.errors.map((err, i) => (
-                  <li key={i} className="text-xs text-red-600 flex gap-2">
+                  <li key={i} className="text-xs text-red-600 dark:text-red-300 flex gap-2">
                     <span className="font-mono shrink-0">Row {err.rowNo} [{err.id}]</span>
                     <span>— {err.message}</span>
                   </li>
@@ -408,7 +408,7 @@ export function PlanningCsvImport({ existingIds, onImportComplete, onPreviewRead
               setResult(null)
               setParseError(null)
             }}
-            className="w-fit flex items-center gap-1.5 px-4 py-2 rounded border border-gray-300 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+            className="w-fit flex items-center gap-1.5 px-4 py-2 rounded border border-gray-300 dark:border-slate-600 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"
           >
             <Upload size={14} />
             Import Another File

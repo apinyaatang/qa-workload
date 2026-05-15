@@ -7,11 +7,11 @@ interface Props {
 }
 
 const config: Record<WorkloadStatus, { bg: string; text: string; dot: string; label: string }> = {
-  Overloaded:    { bg: 'bg-red-100',    text: 'text-red-700',    dot: 'bg-red-500',    label: 'Overloaded' },
-  'High Load':   { bg: 'bg-orange-100', text: 'text-orange-700', dot: 'bg-orange-500', label: 'High Load' },
-  Normal:        { bg: 'bg-green-100',  text: 'text-green-700',  dot: 'bg-green-500',  label: 'Normal' },
-  Underutilized: { bg: 'bg-blue-100',   text: 'text-blue-700',   dot: 'bg-blue-500',   label: 'Underutilized' },
-  Idle:          { bg: 'bg-gray-100',   text: 'text-gray-600',   dot: 'bg-gray-400',   label: 'Idle' },
+  Overloaded:    { bg: 'bg-red-100 dark:bg-red-900/30',    text: 'text-red-700 dark:text-red-300',    dot: 'bg-red-500',    label: 'Overloaded' },
+  'High Load':   { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-300', dot: 'bg-orange-500', label: 'High Load' },
+  Normal:        { bg: 'bg-green-100 dark:bg-green-900/20',  text: 'text-green-700 dark:text-green-300',  dot: 'bg-green-500',  label: 'Normal' },
+  Underutilized: { bg: 'bg-blue-100 dark:bg-blue-900/30',   text: 'text-blue-700 dark:text-blue-300',   dot: 'bg-blue-500',   label: 'Underutilized' },
+  Idle:          { bg: 'bg-gray-100 dark:bg-slate-700',   text: 'text-gray-600 dark:text-slate-300',   dot: 'bg-gray-400',   label: 'Idle' },
 }
 
 export default function WorkloadBadge({ status, pct, size = 'md' }: Props) {

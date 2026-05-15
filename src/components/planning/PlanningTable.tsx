@@ -31,11 +31,11 @@ function isPast(iso: string | null | undefined, today: Date): boolean {
 }
 
 const PRIORITY_BADGE: Record<string, string> = {
-  Critical: 'bg-red-100 text-red-700 border border-red-300',
-  High: 'bg-orange-100 text-orange-700 border border-orange-300',
-  Medium: 'bg-yellow-100 text-yellow-700 border border-yellow-300',
-  Low: 'bg-blue-100 text-blue-700 border border-blue-300',
-  '': 'bg-gray-100 text-gray-500 border border-gray-200',
+  Critical: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700',
+  High: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border border-orange-300 dark:border-orange-700',
+  Medium: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border border-yellow-300',
+  Low: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700',
+  '': 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 border border-gray-200 dark:border-slate-600',
 }
 
 const SORTABLE_COLUMNS: PlanningSortField[] = [
@@ -104,7 +104,7 @@ function TesterCell({
           }
           if (e.key === 'Escape') setEditing(false)
         }}
-        className="w-28 border border-blue-400 rounded px-1 py-0.5 text-xs focus:outline-none"
+        className="w-28 border border-blue-400 rounded px-1 py-0.5 text-xs focus:outline-none dark:bg-slate-700 dark:text-slate-200"
       />
     )
   }
@@ -112,8 +112,8 @@ function TesterCell({
   return (
     <span
       onClick={() => setEditing(true)}
-      className={`cursor-pointer flex items-center gap-1 whitespace-nowrap rounded px-1 py-0.5 hover:bg-gray-100 ${
-        hasMissingTester ? 'text-red-600' : 'text-gray-700'
+      className={`cursor-pointer flex items-center gap-1 whitespace-nowrap rounded px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-slate-600 ${
+        hasMissingTester ? 'text-red-600' : 'text-gray-700 dark:text-slate-200'
       }`}
       title="Click to assign tester"
     >
@@ -127,18 +127,18 @@ function TesterCell({
 
 export function PlanningTable({ rows, sort, onSort, onAssignTester, today }: Props) {
   function SortIcon({ field }: { field: PlanningSortField }) {
-    if (sort.field !== field) return <span className="text-gray-300 ml-1">↕</span>
+    if (sort.field !== field) return <span className="text-gray-300 dark:text-slate-600 ml-1">↕</span>
     return sort.dir === 'asc'
       ? <ArrowUp size={12} className="inline ml-1 text-blue-600" />
       : <ArrowDown size={12} className="inline ml-1 text-blue-600" />
   }
 
   const thBase =
-    'px-3 py-2 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50 border-b border-gray-200'
-  const tdBase = 'px-3 py-2 text-xs text-gray-700 border-b border-gray-100 align-middle'
+    'px-3 py-2 text-left text-[11px] font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide whitespace-nowrap bg-gray-50 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-600'
+  const tdBase = 'px-3 py-2 text-xs text-gray-700 dark:text-slate-200 border-b border-gray-100 dark:border-slate-700 align-middle'
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+    <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm">
       <table className="min-w-full border-collapse text-sm">
         <thead>
           <tr>
@@ -147,8 +147,8 @@ export function PlanningTable({ rows, sort, onSort, onAssignTester, today }: Pro
               return (
                 <th
                   key={ci}
-                  className={`${thBase} ${col.sticky ? 'sticky left-0 z-10 bg-gray-50 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.1)]' : ''} ${
-                    sortable ? 'cursor-pointer select-none hover:bg-gray-100' : ''
+                  className={`${thBase} ${col.sticky ? 'sticky left-0 z-10 bg-gray-50 dark:bg-slate-700 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.1)]' : ''} ${
+                    sortable ? 'cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-slate-600' : ''
                   }`}
                   onClick={sortable && col.field ? () => onSort(col.field!) : undefined}
                 >
@@ -162,7 +162,7 @@ export function PlanningTable({ rows, sort, onSort, onAssignTester, today }: Pro
         <tbody>
           {rows.length === 0 && (
             <tr>
-              <td colSpan={COLUMNS.length} className="py-12 text-center text-sm text-gray-400">
+              <td colSpan={COLUMNS.length} className="py-12 text-center text-sm text-gray-400 dark:text-slate-500">
                 No records match the current filters.
               </td>
             </tr>
@@ -177,8 +177,8 @@ export function PlanningTable({ rows, sort, onSort, onAssignTester, today }: Pro
 
             // Row background priority: critical > golive-near > uat-near > missing-tester
             let rowBg = ''
-            if (isMissingTester) rowBg = 'bg-red-50'
-            if (isUatNear) rowBg = 'bg-yellow-50'
+            if (isMissingTester) rowBg = 'bg-red-50 dark:bg-red-900/20'
+            if (isUatNear) rowBg = 'bg-yellow-50 dark:bg-yellow-900/20'
             if (isGoLiveNear) rowBg = 'bg-orange-50'
             // critical-priority uses left border, not bg override
 
@@ -189,13 +189,13 @@ export function PlanningTable({ rows, sort, onSort, onAssignTester, today }: Pro
             const goLiveNearHighlight = isWithin7Days(row.goLiveDate, today)
 
             return (
-              <tr key={row.id} className={`${rowBg} ${leftBorder} hover:bg-blue-50/40 transition-colors`}>
+              <tr key={row.id} className={`${rowBg} ${leftBorder} hover:bg-blue-50/40 dark:hover:bg-slate-700/50 transition-colors`}>
                 {/* # */}
-                <td className={`${tdBase} text-gray-400 text-center w-10`}>{idx + 1}</td>
+                <td className={`${tdBase} text-gray-400 dark:text-slate-500 text-center w-10`}>{idx + 1}</td>
 
                 {/* ID — sticky */}
                 <td
-                  className={`${tdBase} sticky left-0 z-10 bg-white font-mono text-xs text-blue-700 whitespace-nowrap shadow-[2px_0_4px_-1px_rgba(0,0,0,0.07)] ${rowBg}`}
+                  className={`${tdBase} sticky left-0 z-10 bg-white dark:bg-slate-800 font-mono text-xs text-blue-700 dark:text-blue-300 whitespace-nowrap shadow-[2px_0_4px_-1px_rgba(0,0,0,0.07)] ${rowBg}`}
                 >
                   {row.id}
                 </td>
@@ -224,7 +224,7 @@ export function PlanningTable({ rows, sort, onSort, onAssignTester, today }: Pro
                 {/* Tags */}
                 <td className={tdBase}>
                   {row.tags ? (
-                    <span className="inline-block px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[11px] whitespace-nowrap">
+                    <span className="inline-block px-2 py-0.5 rounded-full bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 text-[11px] whitespace-nowrap">
                       {row.tags}
                     </span>
                   ) : '—'}
@@ -276,7 +276,7 @@ export function PlanningTable({ rows, sort, onSort, onAssignTester, today }: Pro
                 <td className={`${tdBase} min-w-[90px]`}>
                   {row.testingPercent != null ? (
                     <div className="flex items-center gap-1.5">
-                      <div className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden min-w-[50px]">
+                      <div className="flex-1 h-1.5 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden min-w-[50px]">
                         <div
                           className={`h-full rounded-full transition-all ${
                             row.testingPercent >= 100
@@ -288,7 +288,7 @@ export function PlanningTable({ rows, sort, onSort, onAssignTester, today }: Pro
                           style={{ width: `${Math.min(100, row.testingPercent)}%` }}
                         />
                       </div>
-                      <span className="text-[11px] text-gray-600 whitespace-nowrap">
+                      <span className="text-[11px] text-gray-600 dark:text-slate-300 whitespace-nowrap">
                         {row.testingPercent}%
                       </span>
                     </div>
@@ -314,7 +314,7 @@ export function PlanningTable({ rows, sort, onSort, onAssignTester, today }: Pro
                 <td className={`${tdBase} whitespace-nowrap`}>
                   <span
                     className={`font-semibold ${
-                      testDatePast ? 'text-red-600' : 'text-gray-800'
+                      testDatePast ? 'text-red-600' : 'text-gray-800 dark:text-slate-100'
                     }`}
                   >
                     {formatDate(row.testDate)}

@@ -20,16 +20,16 @@ export default function MasterHoliday() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <h2 className="text-base font-bold text-gray-900">วันหยุดนักขัตฤกษ์</h2>
-        <p className="text-sm text-gray-400 mt-0.5">กำหนดปฏิทินวันหยุดที่ใช้คำนวณ Capacity ของพนักงาน</p>
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm p-5">
+        <h2 className="text-base font-bold text-gray-900 dark:text-white">วันหยุดนักขัตฤกษ์</h2>
+        <p className="text-sm text-gray-400 dark:text-slate-500 mt-0.5">กำหนดปฏิทินวันหยุดที่ใช้คำนวณ Capacity ของพนักงาน</p>
 
         <form onSubmit={handleAdd} className="mt-4 flex gap-3 flex-wrap">
           <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400" required />
+            className="border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-200" required />
           <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
             placeholder="ชื่อวันหยุด เช่น วันแรงงาน"
-            className="flex-1 min-w-[200px] border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400" required />
+            className="flex-1 min-w-[200px] border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-200 dark:placeholder-slate-400" required />
           <button type="submit"
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">
             <Plus size={15} /> เพิ่มวันหยุด
@@ -37,43 +37,43 @@ export default function MasterHoliday() {
         </form>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-50 bg-gray-50">
-          <p className="text-xs text-gray-500 font-medium">รายการวันหยุดทั้งหมด ({publicHolidays.length} วัน)</p>
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-50 dark:border-slate-700 bg-gray-50 dark:bg-slate-700">
+          <p className="text-xs text-gray-500 dark:text-slate-400 font-medium">รายการวันหยุดทั้งหมด ({publicHolidays.length} วัน)</p>
         </div>
         {sorted.length === 0 ? (
           <div className="py-12 text-center">
-            <Calendar size={32} className="mx-auto text-gray-200 mb-2" />
-            <p className="text-sm text-gray-400">ยังไม่มีวันหยุดที่กำหนด</p>
+            <Calendar size={32} className="mx-auto text-gray-200 dark:text-slate-600 mb-2" />
+            <p className="text-sm text-gray-400 dark:text-slate-500">ยังไม่มีวันหยุดที่กำหนด</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-gray-50 dark:divide-slate-700">
             {sorted.map(h => (
-              <div key={h.id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50/50">
+              <div key={h.id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50/50 dark:hover:bg-slate-700/50">
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center text-center">
-                    <p className="text-xs font-bold text-indigo-600 leading-none">
+                  <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/40 rounded-lg flex items-center justify-center text-center">
+                    <p className="text-xs font-bold text-indigo-600 dark:text-indigo-300 leading-none">
                       {new Date(h.date).getDate()}<br />
                       <span className="text-[9px] font-normal">{new Date(h.date).toLocaleString('th', { month: 'short' })}</span>
                     </p>
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900 text-sm">{h.name}</p>
-                    <p className="text-xs text-gray-400">{formatDate(h.date)}</p>
+                    <p className="font-medium text-gray-900 dark:text-white text-sm">{h.name}</p>
+                    <p className="text-xs text-gray-400 dark:text-slate-500">{formatDate(h.date)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
                   {deleteConfirm === h.id ? (
                     <>
-                      <button onClick={() => { removePublicHoliday(h.id); setDeleteConfirm(null) }} className="p-1.5 text-red-600 hover:bg-red-50 rounded">
+                      <button onClick={() => { removePublicHoliday(h.id); setDeleteConfirm(null) }} className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded">
                         <Check size={14} />
                       </button>
-                      <button onClick={() => setDeleteConfirm(null)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded">
+                      <button onClick={() => setDeleteConfirm(null)} className="p-1.5 text-gray-400 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-600 rounded">
                         <X size={14} />
                       </button>
                     </>
                   ) : (
-                    <button onClick={() => setDeleteConfirm(h.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
+                    <button onClick={() => setDeleteConfirm(h.id)} className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded">
                       <Trash2 size={14} />
                     </button>
                   )}

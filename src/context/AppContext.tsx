@@ -41,6 +41,9 @@ interface AppContextType extends AppState {
   // Cross-page navigation signal: set before navigating to 'planning'
   planningInitialTester: string | null
   setPlanningInitialTester: (t: string | null) => void
+  // Dark mode
+  isDarkMode: boolean
+  toggleDarkMode: () => void
 }
 
 const AppContext = createContext<AppContextType | null>(null)
@@ -63,6 +66,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [dbError,                 setDbError]                 = useState<string | null>(null)
   const [isOnline,                setIsOnline]                = useState(isConfigured)
   const [planningInitialTester,   setPlanningInitialTester]   = useState<string | null>(null)
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() =>
+    localStorage.getItem('wiq:theme') === 'dark'
+  )
+
+  function toggleDarkMode() {
+    setIsDarkMode(prev => {
+      const next = !prev
+      localStorage.setItem('wiq:theme', next ? 'dark' : 'light')
+      return next
+    })
+  }
 
   // ── Load from Supabase on mount (when configured) ─────────────────────────
   useEffect(() => {
@@ -297,6 +311,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addImportSession, applyImportSession, deleteImportSession,
       resetToDefaults,
       planningInitialTester, setPlanningInitialTester,
+      isDarkMode, toggleDarkMode,
     }}>
       {children}
     </AppContext.Provider>

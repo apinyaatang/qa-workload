@@ -181,15 +181,15 @@ export default function TeamDashboard() {
       {/* Header info */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 dark:text-slate-400">
             สัปดาห์นี้ ({weekDays[0]?.slice(5).replace('-', '/') ?? '–'} – {weekDays.at(-1)?.slice(5).replace('-', '/') ?? '–'}) · Capacity {CAPACITY_H}h/คน
           </p>
         </div>
-        <p className="text-xs text-gray-400">{todayStr}</p>
+        <p className="text-xs text-gray-400 dark:text-slate-500">{todayStr}</p>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-24 gap-3 text-gray-400">
+        <div className="flex items-center justify-center py-24 gap-3 text-gray-400 dark:text-slate-500">
           <Loader2 size={22} className="animate-spin text-indigo-500" />
           <span className="text-sm">กำลังโหลด QA Planning data…</span>
         </div>
@@ -202,21 +202,21 @@ export default function TeamDashboard() {
               value={workloads.length}
               sub={`จาก ${activeEmployees.length} คน active`}
               icon={<Users size={20} className="text-indigo-600" />}
-              iconBg="bg-indigo-50"
+              iconBg="bg-indigo-50 dark:bg-indigo-900/40"
             />
             <StatCard
               label="Team Avg Workload"
               value={`${avgPct}%`}
               sub={`Capacity ${CAPACITY_H}h/สัปดาห์`}
               icon={<TrendingUp size={20} className="text-green-600" />}
-              iconBg="bg-green-50"
+              iconBg="bg-green-50 dark:bg-green-900/20"
             />
             <StatCard
               label="Overloaded / High Load"
               value={`${workloads.filter(w => w.status === 'Overloaded').length} / ${workloads.filter(w => w.status === 'High Load').length}`}
               sub="คนที่มีงานหนัก"
               icon={<AlertTriangle size={20} className="text-red-500" />}
-              iconBg="bg-red-50"
+              iconBg="bg-red-50 dark:bg-red-900/20"
             />
             <StatCard
               label="Feedback UAT Hours"
@@ -228,15 +228,15 @@ export default function TeamDashboard() {
           </div>
 
           {workloads.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center text-gray-400">
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm p-12 text-center text-gray-400 dark:text-slate-500">
               <p className="text-base font-medium mb-1">ไม่พบงาน QA ในสัปดาห์นี้</p>
               <p className="text-sm">Import Iteration Planning CSV และ Master Staff ก่อน แล้วมาดูที่นี่</p>
             </div>
           ) : (
             <>
               {/* Chart */}
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-                <h2 className="text-base font-semibold text-gray-800 mb-4">Workload % รายคน (สัปดาห์นี้)</h2>
+              <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm p-5">
+                <h2 className="text-base font-semibold text-gray-800 dark:text-slate-100 mb-4">Workload % รายคน (สัปดาห์นี้)</h2>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -254,7 +254,7 @@ export default function TeamDashboard() {
                 </ResponsiveContainer>
 
                 {/* Stacked hours chart */}
-                <h2 className="text-base font-semibold text-gray-800 mb-3 mt-6">Testing vs Feedback UAT Hours</h2>
+                <h2 className="text-base font-semibold text-gray-800 dark:text-slate-100 mb-3 mt-6">Testing vs Feedback UAT Hours</h2>
                 <ResponsiveContainer width="100%" height={160}>
                   <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -269,14 +269,14 @@ export default function TeamDashboard() {
               </div>
 
               {/* Member Table */}
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-100">
-                  <h2 className="text-base font-semibold text-gray-800">รายละเอียดรายคน — สัปดาห์นี้</h2>
+              <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100 dark:border-slate-700">
+                  <h2 className="text-base font-semibold text-gray-800 dark:text-slate-100">รายละเอียดรายคน — สัปดาห์นี้</h2>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-gray-50 text-gray-500 text-xs">
+                      <tr className="bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-slate-400 text-xs">
                         <th className="text-left px-5 py-3 font-medium">พนักงาน</th>
                         <th className="text-left px-4 py-3 font-medium">Group</th>
                         <th className="text-left px-4 py-3 font-medium">Status</th>
@@ -288,27 +288,27 @@ export default function TeamDashboard() {
                         <th className="text-right px-4 py-3 font-medium">Tasks</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody className="divide-y divide-gray-50 dark:divide-slate-700">
                       {workloads
                         .slice()
                         .sort((a, b) => b.workloadPct - a.workloadPct)
                         .map(w => {
                           const c = WORKLOAD_COLORS[w.status]
                           return (
-                            <tr key={w.employee.id} className="hover:bg-gray-50/50 transition-colors">
+                            <tr key={w.employee.id} className="hover:bg-gray-50/50 dark:hover:bg-slate-700/50 transition-colors">
                               <td className="px-5 py-3">
-                                <p className="font-medium text-gray-900">
+                                <p className="font-medium text-gray-900 dark:text-white">
                                   {w.employee.firstName} {w.employee.lastName}
                                   {w.employee.nickname && (
-                                    <span className="ml-1 text-xs text-gray-400">({w.employee.nickname})</span>
+                                    <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">({w.employee.nickname})</span>
                                   )}
                                 </p>
-                                <p className="text-xs text-gray-400">{w.employee.position}</p>
+                                <p className="text-xs text-gray-400 dark:text-slate-500">{w.employee.position}</p>
                               </td>
-                              <td className="px-4 py-3 text-gray-600 text-xs">{w.employee.group || w.employee.department || '—'}</td>
+                              <td className="px-4 py-3 text-gray-600 dark:text-slate-300 text-xs">{w.employee.group || w.employee.department || '—'}</td>
                               <td className="px-4 py-3"><StatusBadge status={w.status} /></td>
                               <td className="px-4 py-3 w-36">
-                                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden mb-1">
+                                <div className="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden mb-1">
                                   <div
                                     className="h-2 rounded-full"
                                     style={{
@@ -317,21 +317,21 @@ export default function TeamDashboard() {
                                     }}
                                   />
                                 </div>
-                                <span className="text-xs font-semibold text-gray-700">{w.workloadPct}%</span>
+                                <span className="text-xs font-semibold text-gray-700 dark:text-slate-200">{w.workloadPct}%</span>
                               </td>
-                              <td className="px-4 py-3 text-right text-gray-700 font-medium">{w.testingHours}h</td>
+                              <td className="px-4 py-3 text-right text-gray-700 dark:text-slate-200 font-medium">{w.testingHours}h</td>
                               <td className="px-4 py-3 text-right">
-                                <span className={w.feedbackHours > 0 ? 'text-orange-600 font-medium' : 'text-gray-300'}>
+                                <span className={w.feedbackHours > 0 ? 'text-orange-600 font-medium' : 'text-gray-300 dark:text-slate-600'}>
                                   {w.feedbackHours}h
                                 </span>
                               </td>
-                              <td className="px-4 py-3 text-right font-semibold text-gray-800">{w.totalHours}h</td>
+                              <td className="px-4 py-3 text-right font-semibold text-gray-800 dark:text-slate-100">{w.totalHours}h</td>
                               <td className="px-4 py-3 text-right">
-                                <span className={w.remainingHours === 0 ? 'text-red-600 font-semibold' : 'text-gray-600'}>
+                                <span className={w.remainingHours === 0 ? 'text-red-600 font-semibold' : 'text-gray-600 dark:text-slate-300'}>
                                   {w.remainingHours}h
                                 </span>
                               </td>
-                              <td className="px-4 py-3 text-right text-gray-500">{w.taskCount}</td>
+                              <td className="px-4 py-3 text-right text-gray-500 dark:text-slate-400">{w.taskCount}</td>
                             </tr>
                           )
                         })}

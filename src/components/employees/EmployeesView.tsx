@@ -114,13 +114,13 @@ function PeriodSelector({
   return (
     <div className="flex items-center gap-3 flex-wrap">
       {/* Mode toggle */}
-      <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+      <div className="flex rounded-lg border border-gray-200 dark:border-slate-600 overflow-hidden text-sm">
         {(['weekly', 'custom'] as PeriodMode[]).map(m => (
           <button
             key={m}
             onClick={() => onModeChange(m)}
             className={`px-3 py-1.5 font-medium transition-colors ${
-              mode === m ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+              mode === m ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-600'
             }`}
           >
             {m === 'weekly' ? 'รายสัปดาห์' : 'Custom'}
@@ -132,16 +132,16 @@ function PeriodSelector({
         <div className="flex items-center gap-1.5">
           <button
             onClick={onPrevWeek}
-            className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"
+            className="p-1.5 rounded-lg border border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700"
           >
             <ChevronLeft size={15} />
           </button>
-          <span className="text-sm font-semibold text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg min-w-[160px] text-center">
+          <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/40 px-3 py-1.5 rounded-lg min-w-[160px] text-center">
             {periodLabel}
           </span>
           <button
             onClick={onNextWeek}
-            className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"
+            className="p-1.5 rounded-lg border border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700"
           >
             <ChevronRight size={15} />
           </button>
@@ -160,17 +160,17 @@ function PeriodSelector({
             type="date"
             value={customStart}
             onChange={e => onCustomStart(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-indigo-400"
+            className="border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-indigo-400 bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-200"
           />
-          <span className="text-gray-400 text-sm">–</span>
+          <span className="text-gray-400 dark:text-slate-500 text-sm">–</span>
           <input
             type="date"
             value={customEnd}
             onChange={e => onCustomEnd(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-indigo-400"
+            className="border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-indigo-400 bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-200"
           />
           {customStart && customEnd && (
-            <span className="text-xs text-indigo-600 font-medium bg-indigo-50 px-2 py-1 rounded-lg">
+            <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium bg-indigo-50 dark:bg-indigo-900/40 px-2 py-1 rounded-lg">
               {periodLabel}
             </span>
           )}
@@ -263,11 +263,11 @@ export default function EmployeesView() {
       )}
 
       {/* Header + Period Selector */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4 space-y-3">
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm px-5 py-4 space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <p className="text-sm font-semibold text-gray-800">Monitor and Assign</p>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-sm font-semibold text-gray-800 dark:text-slate-100">Monitor and Assign</p>
+            <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
               Active {activeEmployees.length} คน · QA Projects {planningProjects.length} รายการ
               {loadingProjects && ' · กำลังโหลด…'}
             </p>
@@ -297,7 +297,7 @@ export default function EmployeesView() {
 
         {/* Status legend + counts */}
         {!loadingProjects && periodDays.length > 0 && (
-          <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-50">
+          <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-50 dark:border-slate-700">
             {(Object.keys(STATUS_SORT) as QaWorkloadStatus[]).map(status => {
               const count = employeeWorkloads.filter(w => w.qa.status === status).length
               const c     = WORKLOAD_COLORS[status]
@@ -314,7 +314,7 @@ export default function EmployeesView() {
 
       {/* Employee cards */}
       {periodDays.length === 0 && mode === 'custom' ? (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-10 text-center text-gray-400 text-sm">
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm p-10 text-center text-gray-400 dark:text-slate-500 text-sm">
           เลือก Custom date range เพื่อดู Workload
         </div>
       ) : (
@@ -326,24 +326,24 @@ export default function EmployeesView() {
               <div
                 key={emp.id}
                 onClick={() => !leaveModalEmpId && handleCardClick(emp, qa.allTasks ?? [])}
-                className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer group"
+                className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm p-5 hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-700 transition-all cursor-pointer group"
               >
                 {/* Header */}
                 <div className="flex items-start gap-3">
-                  <div className="w-11 h-11 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
-                    <User size={20} className="text-indigo-600" />
+                  <div className="w-11 h-11 bg-indigo-100 dark:bg-indigo-900/40 rounded-full flex items-center justify-center shrink-0">
+                    <User size={20} className="text-indigo-600 dark:text-indigo-400" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate">
+                    <h3 className="font-semibold text-gray-900 dark:text-white truncate">
                       {emp.firstName} {emp.lastName}
                       {emp.nickname && (
-                        <span className="ml-1 text-xs text-gray-400">({emp.nickname})</span>
+                        <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">({emp.nickname})</span>
                       )}
                     </h3>
-                    <p className="text-xs text-gray-500">{emp.position}</p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400">{emp.position}</p>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {emp.group && (
-                        <span className="text-xs bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded">{emp.group}</span>
+                        <span className="text-xs bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded">{emp.group}</span>
                       )}
                     </div>
                   </div>
@@ -354,18 +354,18 @@ export default function EmployeesView() {
                 <div className="mt-4 space-y-2">
                   {qa.activeTasks.length > 0 ? (
                     <>
-                      <div className="flex items-center justify-between text-xs text-gray-500">
+                      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-slate-400">
                         <span>งานใน period นี้ ({periodDays.length} วัน)</span>
                         <span className={`font-semibold ${
                           qa.peakCount > 3 ? 'text-red-600' :
-                          qa.peakCount > 1 ? 'text-orange-600' : 'text-gray-700'
+                          qa.peakCount > 1 ? 'text-orange-600' : 'text-gray-700 dark:text-slate-200'
                         }`}>
                           สูงสุด {qa.peakCount} งาน/วัน
                         </span>
                       </div>
 
                       {/* Workload bar */}
-                      <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                      <div className="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
                         <div
                           className="h-2 rounded-full transition-all"
                           style={{
@@ -380,23 +380,23 @@ export default function EmployeesView() {
                       {/* Active task list */}
                       <div className="space-y-1 mt-2">
                         {qa.activeTasks.slice(0, 3).map(p => (
-                          <div key={p.id} className="flex items-start gap-1.5 text-xs text-gray-600">
+                          <div key={p.id} className="flex items-start gap-1.5 text-xs text-gray-600 dark:text-slate-300">
                             <span className="mt-0.5 w-1.5 h-1.5 rounded-full shrink-0 bg-orange-400" />
                             <span className="truncate">{p.projectName}</span>
                             {p.uatDate && (
-                              <span className="ml-auto shrink-0 text-gray-400">
+                              <span className="ml-auto shrink-0 text-gray-400 dark:text-slate-500">
                                 UAT {p.uatDate.slice(5).replace('-', '/')}
                               </span>
                             )}
                           </div>
                         ))}
                         {qa.activeTasks.length > 3 && (
-                          <p className="text-xs text-gray-400 pl-3">+{qa.activeTasks.length - 3} งาน</p>
+                          <p className="text-xs text-gray-400 dark:text-slate-500 pl-3">+{qa.activeTasks.length - 3} งาน</p>
                         )}
                       </div>
                     </>
                   ) : (
-                    <div className="flex items-center gap-2 text-xs text-gray-400 py-2">
+                    <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-slate-500 py-2">
                       <ClipboardList size={14} />
                       {loadingProjects ? 'กำลังโหลด…' : `ไม่มีงาน QA ใน ${periodLabel}`}
                     </div>
@@ -404,8 +404,8 @@ export default function EmployeesView() {
                 </div>
 
                 {/* Footer */}
-                <div className="mt-3 pt-3 border-t border-gray-50 flex items-center justify-between">
-                  <div className="flex items-center gap-1 text-xs text-gray-400">
+                <div className="mt-3 pt-3 border-t border-gray-50 dark:border-slate-700 flex items-center justify-between">
+                  <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-slate-500">
                     <Calendar size={12} />
                     <span>ลา {approvedLeaves} วัน</span>
                     {emp.wfhDays && emp.wfhDays.length > 0 && (
@@ -415,7 +415,7 @@ export default function EmployeesView() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={e => { e.stopPropagation(); setLeaveModalEmpId(emp.id) }}
-                      className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 px-2 py-1 rounded"
+                      className="text-xs text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 border border-gray-200 dark:border-slate-600 px-2 py-1 rounded"
                     >
                       + ลา
                     </button>

@@ -5,9 +5,9 @@ import type { Project, ProjectStatus } from '../../types'
 import { formatDate } from '../../utils/dateUtils'
 
 const statusColors: Record<ProjectStatus, string> = {
-  Active:    'bg-green-100 text-green-700',
-  Inactive:  'bg-gray-100 text-gray-500',
-  Completed: 'bg-blue-100 text-blue-700',
+  Active:    'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300',
+  Inactive:  'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400',
+  Completed: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
 }
 
 const DEPARTMENTS = ['Engineering', 'Design', 'Product', 'Marketing', 'QA', 'DevOps', 'Finance', 'HR']
@@ -75,11 +75,11 @@ export default function MasterProject() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm p-5">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <h2 className="text-base font-bold text-gray-900">Master Project</h2>
-            <p className="text-sm text-gray-400 mt-0.5">จัดการข้อมูล Project ทั้งหมด ({projects.length} รายการ)</p>
+            <h2 className="text-base font-bold text-gray-900 dark:text-white">Master Project</h2>
+            <p className="text-sm text-gray-400 dark:text-slate-500 mt-0.5">จัดการข้อมูล Project ทั้งหมด ({projects.length} รายการ)</p>
           </div>
           <button
             onClick={openNew}
@@ -92,18 +92,18 @@ export default function MasterProject() {
         {/* Filters */}
         <div className="mt-4 flex gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" />
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="ค้นหา Project..."
-              className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-400"
+              className="w-full pl-9 pr-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm outline-none focus:border-indigo-400 bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-200 dark:placeholder-slate-400"
             />
           </div>
           <select
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none"
+            className="border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm outline-none bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-200"
           >
             <option value="all">ทุก Status</option>
             {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -112,11 +112,11 @@ export default function MasterProject() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-100">
+              <tr className="bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-slate-400 text-xs border-b border-gray-100 dark:border-slate-700">
                 <th className="text-left px-5 py-3 font-medium">รหัส / ชื่อ Project</th>
                 <th className="text-left px-4 py-3 font-medium">แผนก</th>
                 <th className="text-left px-4 py-3 font-medium">Owner</th>
@@ -127,53 +127,53 @@ export default function MasterProject() {
                 <th className="px-4 py-3 w-24" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-gray-50 dark:divide-slate-700">
               {filtered.map(p => {
                 const owner = employees.find(e => e.id === p.ownerId)
                 return (
-                  <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr key={p.id} className="hover:bg-gray-50/50 dark:hover:bg-slate-700/50 transition-colors">
                     <td className="px-5 py-3">
-                      <p className="font-semibold text-gray-900">{p.name}</p>
-                      <p className="text-xs text-indigo-600 font-mono mt-0.5">{p.code}</p>
-                      {p.description && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{p.description}</p>}
+                      <p className="font-semibold text-gray-900 dark:text-white">{p.name}</p>
+                      <p className="text-xs text-indigo-600 dark:text-indigo-400 font-mono mt-0.5">{p.code}</p>
+                      {p.description && <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 line-clamp-1">{p.description}</p>}
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{p.department}</td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {owner ? `${owner.firstName} ${owner.lastName}` : <span className="text-gray-300">—</span>}
+                    <td className="px-4 py-3 text-gray-600 dark:text-slate-300">{p.department}</td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-slate-200">
+                      {owner ? `${owner.firstName} ${owner.lastName}` : <span className="text-gray-300 dark:text-slate-600">—</span>}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusColors[p.status]}`}>
                         {p.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{formatDate(p.startDate)}</td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {p.endDate ? formatDate(p.endDate) : <span className="text-gray-300">—</span>}
+                    <td className="px-4 py-3 text-gray-600 dark:text-slate-300">{formatDate(p.startDate)}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-slate-300">
+                      {p.endDate ? formatDate(p.endDate) : <span className="text-gray-300 dark:text-slate-600">—</span>}
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-700">
-                      {p.budget != null ? p.budget.toLocaleString() : <span className="text-gray-300">—</span>}
+                    <td className="px-4 py-3 text-right text-gray-700 dark:text-slate-200">
+                      {p.budget != null ? p.budget.toLocaleString() : <span className="text-gray-300 dark:text-slate-600">—</span>}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => openEdit(p)}
-                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                          className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 rounded transition-colors"
                         >
                           <Pencil size={14} />
                         </button>
                         {deleteConfirm === p.id ? (
                           <span className="flex items-center gap-1">
-                            <button onClick={() => handleDelete(p.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded">
+                            <button onClick={() => handleDelete(p.id)} className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded">
                               <Check size={14} />
                             </button>
-                            <button onClick={() => setDeleteConfirm(null)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded">
+                            <button onClick={() => setDeleteConfirm(null)} className="p-1.5 text-gray-400 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-600 rounded">
                               <X size={14} />
                             </button>
                           </span>
                         ) : (
                           <button
                             onClick={() => setDeleteConfirm(p.id)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -184,7 +184,7 @@ export default function MasterProject() {
                 )
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={8} className="px-5 py-12 text-center text-gray-400">ไม่พบข้อมูล Project</td></tr>
+                <tr><td colSpan={8} className="px-5 py-12 text-center text-gray-400 dark:text-slate-500">ไม่พบข้อมูล Project</td></tr>
               )}
             </tbody>
           </table>
@@ -194,10 +194,10 @@ export default function MasterProject() {
       {/* Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h3 className="font-bold text-gray-900">{editId ? 'แก้ไข Project' : 'เพิ่ม Project ใหม่'}</h3>
-              <button onClick={() => setShowForm(false)}><X size={18} className="text-gray-400" /></button>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-700">
+              <h3 className="font-bold text-gray-900 dark:text-white">{editId ? 'แก้ไข Project' : 'เพิ่ม Project ใหม่'}</h3>
+              <button onClick={() => setShowForm(false)}><X size={18} className="text-gray-400 dark:text-slate-500" /></button>
             </div>
             <form onSubmit={handleSave} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -255,7 +255,7 @@ export default function MasterProject() {
 
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowForm(false)}
-                  className="flex-1 border border-gray-200 text-gray-600 rounded-lg py-2.5 text-sm font-medium hover:bg-gray-50">
+                  className="flex-1 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg py-2.5 text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700">
                   ยกเลิก
                 </button>
                 <button type="submit"
@@ -271,12 +271,12 @@ export default function MasterProject() {
   )
 }
 
-const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100'
+const inputCls = 'w-full border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-200 dark:placeholder-slate-400'
 
 function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">
+      <label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">
         {label}{required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
       {children}

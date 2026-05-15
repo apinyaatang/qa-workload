@@ -29,8 +29,8 @@ export default function PeriodFilter() {
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <Calendar size={16} className="text-gray-500" />
-      <span className="text-sm text-gray-600 font-medium">Period:</span>
+      <Calendar size={16} className="text-gray-500 dark:text-slate-400" />
+      <span className="text-sm text-gray-600 dark:text-slate-300 font-medium">Period:</span>
 
       {(['weekly', 'monthly'] as PeriodType[]).map(t => (
         <button
@@ -39,7 +39,7 @@ export default function PeriodFilter() {
           className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
             selectedPeriod.type === t && !showCustom
               ? 'bg-indigo-600 text-white'
-              : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              : 'bg-white dark:bg-slate-700 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-600'
           }`}
         >
           {t === 'weekly' ? 'รายสัปดาห์' : 'รายเดือน'}
@@ -51,26 +51,26 @@ export default function PeriodFilter() {
         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
           selectedPeriod.type === 'custom'
             ? 'bg-indigo-600 text-white'
-            : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+            : 'bg-white dark:bg-slate-700 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-600'
         }`}
       >
         Custom <ChevronDown size={14} />
       </button>
 
       {showCustom && (
-        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
+        <div className="flex items-center gap-2 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2">
           <input
             type="date"
             value={customStart}
             onChange={e => setCustomStart(e.target.value)}
-            className="text-sm border-none outline-none"
+            className="text-sm border-none outline-none bg-transparent text-gray-700 dark:text-slate-200"
           />
-          <span className="text-gray-400">–</span>
+          <span className="text-gray-400 dark:text-slate-500">–</span>
           <input
             type="date"
             value={customEnd}
             onChange={e => setCustomEnd(e.target.value)}
-            className="text-sm border-none outline-none"
+            className="text-sm border-none outline-none bg-transparent text-gray-700 dark:text-slate-200"
           />
           <button
             onClick={applyCustom}
@@ -81,7 +81,7 @@ export default function PeriodFilter() {
         </div>
       )}
 
-      <span className="text-sm text-indigo-700 font-semibold bg-indigo-50 px-3 py-1.5 rounded-lg">
+      <span className="text-sm text-indigo-700 dark:text-indigo-300 font-semibold bg-indigo-50 dark:bg-indigo-900/40 px-3 py-1.5 rounded-lg">
         {selectedPeriod.label}
       </span>
     </div>
