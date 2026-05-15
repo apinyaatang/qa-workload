@@ -515,10 +515,10 @@ function TabButton({
 }
 
 const URGENCY_COLORS: Record<string, { wrap: string; dot: string }> = {
-  red: { wrap: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300', dot: 'bg-red-500' },
-  amber: { wrap: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
-  orange: { wrap: 'bg-orange-50 border-orange-200 text-orange-700 dark:text-orange-300', dot: 'bg-orange-500' },
-  yellow: { wrap: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 text-yellow-700 dark:text-yellow-300', dot: 'bg-yellow-500' },
+  red:    { wrap: 'bg-red-100 dark:bg-red-900/30 border-red-400 dark:border-red-700 text-red-800 dark:text-red-300',       dot: 'bg-red-500' },
+  amber:  { wrap: 'bg-amber-100 dark:bg-amber-900/30 border-amber-400 dark:border-amber-700 text-amber-800 dark:text-amber-300', dot: 'bg-amber-500' },
+  orange: { wrap: 'bg-orange-100 dark:bg-orange-900/30 border-orange-400 dark:border-orange-700 text-orange-800 dark:text-orange-300', dot: 'bg-orange-500' },
+  yellow: { wrap: 'bg-yellow-100 dark:bg-yellow-900/30 border-yellow-400 dark:border-yellow-700 text-yellow-800 dark:text-yellow-300', dot: 'bg-yellow-500' },
 }
 
 function FilterChip({
