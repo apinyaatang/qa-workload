@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Upload, Loader2, AlertCircle, X, LayoutList, Users, CalendarClock, UserX, ClipboardList,
+  Upload, Loader2, AlertCircle, X, LayoutList, Users, CalendarClock, UserX, ClipboardList, Save,
 } from 'lucide-react'
 import type {
   PlanningProject,
@@ -227,6 +227,10 @@ export default function PlanningView() {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('none')
   const [showImport, setShowImport] = useState(false)
 
+  // ── Pending edits (staged, not yet saved to DB) ──────────────────────────────
+  const [pendingEdits, setPendingEdits] = useState<Map<string, Partial<PlanningProject>>>(new Map())
+  const [saving, setSaving] = useState(false)
+
   // ── Apply initial tester filter when navigated from Monitor and Assign ──────
 
   useEffect(() => {
@@ -265,38 +269,58 @@ export default function PlanningView() {
     )
   }
 
-  // ── Assign tester (inline edit) ──────────────────────────────────────────────
+  // ── Stage an edit (optimistic UI update, queues for Save) ───────────────────
 
-  async function handleAssignTester(id: string, tester: string) {
-    setProjects(prev => prev.map(p => (p.id === id ? { ...p, tester } : p)))
-    try {
-      await planningDb.updateField(id, 'tester', tester)
-    } catch {
-      await loadProjects()
-    }
+  function stageEdit(id: string, patch: Partial<PlanningProject>) {
+    setProjects(prev => prev.map(p => (p.id === id ? { ...p, ...patch } : p)))
+    setPendingEdits(prev => {
+      const m = new Map(prev)
+      m.set(id, { ...(m.get(id) ?? {}), ...patch })
+      return m
+    })
   }
 
-  async function handleUpdateTestingPercent(id: string, value: number | null) {
-    setProjects(prev => prev.map(p => (p.id === id ? { ...p, testingPercent: value } : p)))
-    try {
-      await planningDb.updateField(id, 'testing_percent', value)
-    } catch {
-      await loadProjects()
-    }
+  function handleAssignTester(id: string, tester: string) {
+    stageEdit(id, { tester })
   }
 
-  async function handleUpdateEstimateDay(id: string, value: number | null) {
+  function handleUpdateTestingPercent(id: string, value: number | null) {
+    stageEdit(id, { testingPercent: value })
+  }
+
+  function handleUpdateEstimateDay(id: string, value: number | null) {
     const project = projects.find(p => p.id === id)
     if (!project) return
     const newTestDate = calcTestDate(project.uatDate, project.goLiveDate, value, holidaySet)
-    setProjects(prev =>
-      prev.map(p => (p.id === id ? { ...p, testEstimateDay: value, testDate: newTestDate } : p))
-    )
+    stageEdit(id, { testEstimateDay: value, testDate: newTestDate })
+  }
+
+  // ── Save all pending edits to DB ─────────────────────────────────────────────
+
+  const FIELD_TO_DB: Record<string, string> = {
+    tester:          'tester',
+    testingPercent:  'testing_percent',
+    testEstimateDay: 'test_estimate_day',
+    testDate:        'test_date',
+  }
+
+  async function handleSave() {
+    if (pendingEdits.size === 0) return
+    setSaving(true)
     try {
-      await planningDb.updateField(id, 'test_estimate_day', value)
-      await planningDb.updateField(id, 'test_date', newTestDate)
+      for (const [id, patch] of pendingEdits) {
+        const dbFields: Record<string, unknown> = {}
+        for (const [k, v] of Object.entries(patch)) {
+          const col = FIELD_TO_DB[k]
+          if (col) dbFields[col] = v
+        }
+        await planningDb.updateFields(id, dbFields)
+      }
+      setPendingEdits(new Map())
     } catch {
       await loadProjects()
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -328,6 +352,10 @@ export default function PlanningView() {
 
   const urgency = useMemo(() => getUrgencyCounts(baseFiltered, today), [baseFiltered, today])
 
+  // ── Pending edit IDs (for row highlighting) ──────────────────────────────────
+
+  const pendingEditIds = useMemo(() => new Set(pendingEdits.keys()), [pendingEdits])
+
   // ── Import callbacks ─────────────────────────────────────────────────────────
 
   function handleImportComplete(_result: PlanningImportResult) {
@@ -351,13 +379,33 @@ export default function PlanningView() {
           <h1 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">QA Workload</h1>
           <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{projects.length} projects loaded</p>
         </div>
-        <button
-          onClick={() => setShowImport(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 shadow-sm transition-colors"
-        >
-          <Upload size={15} />
-          Import CSV
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowImport(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 shadow-sm transition-colors"
+          >
+            <Upload size={15} />
+            Import CSV
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={pendingEdits.size === 0 || saving}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-all ${
+              pendingEdits.size > 0
+                ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                : 'bg-gray-200 dark:bg-slate-700 text-gray-400 dark:text-slate-500 cursor-not-allowed'
+            }`}
+            title={pendingEdits.size > 0 ? `บันทึก ${pendingEdits.size} รายการที่แก้ไข` : 'ไม่มีการแก้ไข'}
+          >
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            บันทึก
+            {pendingEdits.size > 0 && (
+              <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-white/30 text-xs font-bold">
+                {pendingEdits.size}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Quick-filter chips — always visible when data loaded */}
@@ -471,6 +519,8 @@ export default function PlanningView() {
               onAssignTester={handleAssignTester}
               onUpdateTestingPercent={handleUpdateTestingPercent}
               onUpdateEstimateDay={handleUpdateEstimateDay}
+              employees={employees}
+              pendingEditIds={pendingEditIds}
               today={today}
             />
           )}
