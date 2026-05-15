@@ -29,6 +29,15 @@ export interface PlanningProject {
 }
 
 // ── CSV import ───────────────────────────────────────────────────────────────
+
+export type ConflictField = 'tester' | 'testingPercent' | 'testEstimateDay'
+
+export interface FieldConflict {
+  field: ConflictField
+  fileValue: string | number | null
+  dbValue:   string | number | null
+}
+
 export interface PlanningCsvRow {
   rowNo: number
   data: Partial<PlanningProject>
@@ -36,6 +45,8 @@ export interface PlanningCsvRow {
   errors: string[]
   isValid: boolean
   willUpdate: boolean   // true if ID already exists in DB
+  conflicts?: FieldConflict[]            // only for willUpdate rows with differing values
+  existingData?: Partial<PlanningProject> // DB snapshot for this ID
 }
 
 export interface PlanningImportResult {

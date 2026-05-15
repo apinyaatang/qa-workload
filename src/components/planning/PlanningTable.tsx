@@ -8,6 +8,8 @@ interface Props {
   sort: PlanningSortState
   onSort: (field: PlanningSortField) => void
   onAssignTester: (id: string, tester: string) => void
+  onUpdateTestingPercent: (id: string, value: number | null) => void
+  onUpdateEstimateDay: (id: string, value: number | null) => void
   today: Date
 }
 
@@ -123,9 +125,136 @@ function TesterCell({
   )
 }
 
+// Inline-edit testing percent cell
+function TestingPercentCell({
+  row,
+  onUpdateTestingPercent,
+}: {
+  row: PlanningProject
+  onUpdateTestingPercent: (id: string, value: number | null) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState(row.testingPercent != null ? String(row.testingPercent) : '')
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        type="number"
+        min={0}
+        max={100}
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        onBlur={() => {
+          const parsed = val.trim() === '' ? null : parseFloat(val)
+          onUpdateTestingPercent(row.id, parsed != null && !isNaN(parsed) ? parsed : null)
+          setEditing(false)
+        }}
+        onKeyDown={e => {
+          if (e.key === 'Enter') {
+            const parsed = val.trim() === '' ? null : parseFloat(val)
+            onUpdateTestingPercent(row.id, parsed != null && !isNaN(parsed) ? parsed : null)
+            setEditing(false)
+          }
+          if (e.key === 'Escape') setEditing(false)
+        }}
+        className="w-16 border border-blue-400 rounded px-1 py-0.5 text-xs focus:outline-none dark:bg-slate-700 dark:text-slate-200"
+      />
+    )
+  }
+
+  return (
+    <div
+      onClick={() => { setVal(row.testingPercent != null ? String(row.testingPercent) : ''); setEditing(true) }}
+      className="flex items-center gap-1.5 cursor-pointer rounded px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-slate-600 min-w-[90px]"
+      title="Click to edit Testing %"
+    >
+      {row.testingPercent != null ? (
+        <>
+          <div className="flex-1 h-1.5 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden min-w-[50px]">
+            <div
+              className={`h-full rounded-full transition-all ${
+                row.testingPercent >= 100
+                  ? 'bg-green-500'
+                  : row.testingPercent >= 50
+                  ? 'bg-blue-500'
+                  : 'bg-orange-400'
+              }`}
+              style={{ width: `${Math.min(100, row.testingPercent)}%` }}
+            />
+          </div>
+          <span className="text-[11px] text-gray-600 dark:text-slate-300 whitespace-nowrap">
+            {row.testingPercent}%
+          </span>
+        </>
+      ) : (
+        <span className="text-gray-400 dark:text-slate-500 italic text-[11px]">—</span>
+      )}
+    </div>
+  )
+}
+
+// Inline-edit estimate day cell
+function EstimateDayCell({
+  row,
+  onUpdateEstimateDay,
+  isMissingEstimate,
+}: {
+  row: PlanningProject
+  onUpdateEstimateDay: (id: string, value: number | null) => void
+  isMissingEstimate: boolean
+}) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState(row.testEstimateDay != null ? String(row.testEstimateDay) : '')
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        type="number"
+        min={0}
+        step={0.5}
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        onBlur={() => {
+          const parsed = val.trim() === '' ? null : parseFloat(val)
+          onUpdateEstimateDay(row.id, parsed != null && !isNaN(parsed) && parsed > 0 ? parsed : null)
+          setEditing(false)
+        }}
+        onKeyDown={e => {
+          if (e.key === 'Enter') {
+            const parsed = val.trim() === '' ? null : parseFloat(val)
+            onUpdateEstimateDay(row.id, parsed != null && !isNaN(parsed) && parsed > 0 ? parsed : null)
+            setEditing(false)
+          }
+          if (e.key === 'Escape') setEditing(false)
+        }}
+        className="w-16 border border-blue-400 rounded px-1 py-0.5 text-xs focus:outline-none dark:bg-slate-700 dark:text-slate-200"
+      />
+    )
+  }
+
+  return (
+    <span
+      onClick={() => { setVal(row.testEstimateDay != null ? String(row.testEstimateDay) : ''); setEditing(true) }}
+      className="flex items-center justify-center gap-1 cursor-pointer rounded px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-slate-600 whitespace-nowrap"
+      title="Click to edit Est. (day)"
+    >
+      {isMissingEstimate ? (
+        <span className="flex items-center gap-1 text-amber-600">
+          <AlertTriangle size={12} />
+          —
+        </span>
+      ) : (
+        <span>{row.testEstimateDay != null ? `${row.testEstimateDay}d` : '—'}</span>
+      )}
+    </span>
+  )
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
-export function PlanningTable({ rows, sort, onSort, onAssignTester, today }: Props) {
+export function PlanningTable({ rows, sort, onSort, onAssignTester, onUpdateTestingPercent, onUpdateEstimateDay, today }: Props) {
   function SortIcon({ field }: { field: PlanningSortField }) {
     if (sort.field !== field) return <span className="text-gray-300 dark:text-slate-600 ml-1">↕</span>
     return sort.dir === 'asc'
@@ -274,25 +403,7 @@ export function PlanningTable({ rows, sort, onSort, onAssignTester, today }: Pro
 
                 {/* Testing % */}
                 <td className={`${tdBase} min-w-[90px]`}>
-                  {row.testingPercent != null ? (
-                    <div className="flex items-center gap-1.5">
-                      <div className="flex-1 h-1.5 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden min-w-[50px]">
-                        <div
-                          className={`h-full rounded-full transition-all ${
-                            row.testingPercent >= 100
-                              ? 'bg-green-500'
-                              : row.testingPercent >= 50
-                              ? 'bg-blue-500'
-                              : 'bg-orange-400'
-                          }`}
-                          style={{ width: `${Math.min(100, row.testingPercent)}%` }}
-                        />
-                      </div>
-                      <span className="text-[11px] text-gray-600 dark:text-slate-300 whitespace-nowrap">
-                        {row.testingPercent}%
-                      </span>
-                    </div>
-                  ) : '—'}
+                  <TestingPercentCell row={row} onUpdateTestingPercent={onUpdateTestingPercent} />
                 </td>
 
                 {/* Tester Flag */}
@@ -300,14 +411,7 @@ export function PlanningTable({ rows, sort, onSort, onAssignTester, today }: Pro
 
                 {/* Test Estimate */}
                 <td className={`${tdBase} whitespace-nowrap text-center`}>
-                  {isMissingEstimate ? (
-                    <span className="flex items-center justify-center gap-1 text-amber-600">
-                      <AlertTriangle size={12} />
-                      —
-                    </span>
-                  ) : (
-                    row.testEstimateDay != null ? `${row.testEstimateDay}d` : '—'
-                  )}
+                  <EstimateDayCell row={row} onUpdateEstimateDay={onUpdateEstimateDay} isMissingEstimate={isMissingEstimate} />
                 </td>
 
                 {/* Test Date */}
