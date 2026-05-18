@@ -35,6 +35,18 @@ const EMPTY_FILTERS: PlanningFiltersType = {
   goLiveDateTo: '',
 }
 
+// Default statuses shown in Tester Workload tab (active / in-progress items)
+const WORKLOAD_DEFAULT_STATUSES: string[] = [
+  'Define : Kick off with customer',
+  'Define : On Business Requirement',
+  'Implement : On Development',
+  'Implement : On SIT/UAT with Customer',
+  'Implement : On Testing',
+  'Implement : Wait for Deployment',
+  'Planning : Internal Kick off project with team',
+  'Planning : Wait for development',
+]
+
 const DEFAULT_SORT: PlanningSortState = { field: 'goLiveDate', dir: 'asc' }
 
 type Tab = 'table' | 'workload'
@@ -239,6 +251,17 @@ export default function PlanningView() {
     setTab('table')                         // land on Table tab to show filtered rows
     setPlanningInitialTester(null)           // consume & clear the signal
   }, [planningInitialTester, setPlanningInitialTester])
+
+  // ── Pre-fill default status filter when switching to Tester Workload tab ──────
+
+  useEffect(() => {
+    if (tab === 'workload') {
+      setFilters(f => ({
+        ...f,
+        statuses: f.statuses.length === 0 ? WORKLOAD_DEFAULT_STATUSES : f.statuses,
+      }))
+    }
+  }, [tab])
 
   // ── Load data ────────────────────────────────────────────────────────────────
 
