@@ -154,7 +154,9 @@ function TesterCell({
         onKeyDown={e => {
           if (e.key === 'Escape') { setOpen(false); setSearch('') }
           if (e.key === 'Enter' && filtered.length === 1) {
-            select(`${filtered[0].firstName} ${filtered[0].lastName}`)
+            const f = filtered[0]
+            const baseName = [f.firstName, f.lastName].filter(Boolean).join(' ')
+            select(f.nickname ? `${baseName} (${f.nickname})` : baseName)
           }
         }}
         className="w-full border border-blue-400 rounded px-2 py-1 text-xs focus:outline-none dark:bg-slate-700 dark:text-slate-200"
@@ -171,16 +173,17 @@ function TesterCell({
           <div className="px-3 py-2 text-xs text-gray-400 dark:text-slate-500">ไม่พบพนักงาน</div>
         ) : (
           filtered.map(e => {
-            const fullName = `${e.firstName} ${e.lastName}`
+            const baseName = [e.firstName, e.lastName].filter(Boolean).join(' ')
+            const canonical = e.nickname ? `${baseName} (${e.nickname})` : baseName
             return (
               <button
                 key={e.id}
-                onClick={() => select(fullName)}
+                onClick={() => select(canonical)}
                 className={`w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors ${
-                  row.tester === fullName ? 'bg-blue-50 dark:bg-blue-900/30 font-semibold text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-slate-200'
+                  row.tester === canonical ? 'bg-blue-50 dark:bg-blue-900/30 font-semibold text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-slate-200'
                 }`}
               >
-                <span>{fullName}</span>
+                <span>{baseName}</span>
                 {e.nickname && (
                   <span className="ml-1.5 text-gray-400 dark:text-slate-500">({e.nickname})</span>
                 )}
