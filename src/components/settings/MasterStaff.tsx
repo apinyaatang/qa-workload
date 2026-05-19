@@ -20,7 +20,7 @@ const LEAVE_TYPES: { value: LeaveType; label: string }[] = [
   { value: 'other',     label: 'อื่นๆ' },
 ]
 
-const inputCls = 'w-full border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-200 dark:placeholder-slate-400'
+const inputCls = 'w-full border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-200 dark:placeholder-slate-400 disabled:bg-gray-50 disabled:dark:bg-slate-800 disabled:text-gray-400 disabled:dark:text-slate-500 disabled:cursor-not-allowed'
 
 function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
   return (
@@ -33,8 +33,9 @@ function Field({ label, children, required }: { label: string; children: React.R
   )
 }
 
-function emptyEmp(): Omit<Employee, 'id'> {
+function emptyEmp(): Omit<Employee, 'id'> & { employeeCode: string } {
   return {
+    employeeCode: '',
     firstName: '', lastName: '', nickname: '', team: '',
     department: 'QA', position: 'QA',
     skills: [], startDate: '', isActive: true,
@@ -49,6 +50,7 @@ export default function MasterStaff() {
   const [editId, setEditId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(emptyEmp())
+  const [formError, setFormError] = useState<string | null>(null)
   const [skillInput, setSkillInput] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [expandedLeave, setExpandedLeave] = useState<string | null>(null)
@@ -71,18 +73,21 @@ export default function MasterStaff() {
   function openNew() {
     setForm(emptyEmp())
     setSkillInput('')
+    setFormError(null)
     setEditId(null)
     setShowForm(true)
   }
 
   function openEdit(emp: Employee) {
     setForm({
+      employeeCode: emp.employeeCode ?? emp.id,
       firstName: emp.firstName, lastName: emp.lastName,
       nickname: emp.nickname ?? '', team: emp.team ?? '',
       department: emp.department, position: emp.position,
       skills: [...emp.skills], startDate: emp.startDate, isActive: emp.isActive,
     })
     setSkillInput('')
+    setFormError(null)
     setEditId(emp.id)
     setShowForm(true)
   }
@@ -97,16 +102,36 @@ export default function MasterStaff() {
 
   function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.firstName || !form.lastName || !form.startDate) return
+    setFormError(null)
+
+    const empCode = (form.employeeCode as string)?.trim()
+
+    // Validate Employee ID
+    if (!empCode) {
+      setFormError('กรุณากรอก Employee ID')
+      return
+    }
+
+    // Uniqueness check: ID must not exist in other employees
+    const isDuplicate = employees.some(emp => {
+      if (editId && emp.id === editId) return false  // skip self when editing
+      return emp.id === empCode || emp.employeeCode === empCode
+    })
+    if (isDuplicate) {
+      setFormError(`Employee ID "${empCode}" มีอยู่แล้วในระบบ กรุณาใช้ ID อื่น`)
+      return
+    }
+
     const payload = {
       ...form,
+      employeeCode: empCode,
       nickname: (form.nickname as string)?.trim() || undefined,
       team:     (form.team as string)?.trim()     || undefined,
     }
     if (editId) {
       updateEmployee({ ...payload, id: editId })
     } else {
-      addEmployee({ ...payload, id: `emp-${Date.now()}` })
+      addEmployee({ ...payload, id: empCode })
     }
     setShowForm(false)
   }
@@ -371,6 +396,30 @@ export default function MasterStaff() {
               <button onClick={() => setShowForm(false)}><X size={18} className="text-gray-400 dark:text-slate-500" /></button>
             </div>
             <form onSubmit={handleSave} className="p-6 space-y-4 overflow-y-auto">
+
+              {/* Employee ID */}
+              <Field label="Employee ID *" required>
+                <input
+                  value={(form as any).employeeCode ?? ''}
+                  onChange={e => { setForm(f => ({ ...f, employeeCode: e.target.value })); setFormError(null) }}
+                  placeholder="เช่น E001, QA-012"
+                  className={inputCls}
+                  disabled={!!editId}
+                  title={editId ? 'ไม่สามารถแก้ไข Employee ID ได้หลังสร้างแล้ว' : ''}
+                />
+                {editId && (
+                  <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-1">Employee ID ไม่สามารถแก้ไขได้หลังจากสร้างแล้ว</p>
+                )}
+              </Field>
+
+              {/* Error message */}
+              {formError && (
+                <div className="flex items-center gap-2 px-3 py-2.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-sm">
+                  <AlertCircle size={15} className="shrink-0" />
+                  {formError}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <Field label="ชื่อ *" required>
                   <input value={form.firstName} onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))}
