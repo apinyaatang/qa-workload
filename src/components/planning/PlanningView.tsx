@@ -253,15 +253,21 @@ export default function PlanningView() {
   }, [planningInitialTester, setPlanningInitialTester])
 
   // ── Pre-fill default status filter when switching to Tester Workload tab ──────
+  // Wait for data to load first, then intersect with statuses that exist in data
+  // so we never end up with a filter that matches nothing.
 
   useEffect(() => {
-    if (tab === 'workload') {
-      setFilters(f => ({
-        ...f,
-        statuses: f.statuses.length === 0 ? WORKLOAD_DEFAULT_STATUSES : f.statuses,
-      }))
-    }
-  }, [tab])
+    if (tab !== 'workload') return
+    if (loading || projects.length === 0) return
+
+    setFilters(f => {
+      if (f.statuses.length > 0) return f   // user already has a selection — don't override
+      const available = new Set(projects.map(p => p.status))
+      const matched = WORKLOAD_DEFAULT_STATUSES.filter(s => available.has(s))
+      // If none of the defaults exist in the data, fall back to showing everything (empty = all)
+      return { ...f, statuses: matched }
+    })
+  }, [tab, loading, projects])
 
   // ── Load data ────────────────────────────────────────────────────────────────
 
