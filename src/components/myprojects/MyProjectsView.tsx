@@ -8,7 +8,7 @@ import type { PlanningProject } from '../../types/planning'
 import ProjectCard from './ProjectCard'
 
 export default function MyProjectsView() {
-  const { user } = useAuth()
+  const { user, role } = useAuth()
   const { employees } = useApp()
   const [projects, setProjects] = useState<PlanningProject[]>([])
   const [loading, setLoading] = useState(true)
@@ -22,8 +22,8 @@ export default function MyProjectsView() {
       try {
         const allProjects = await planningDb.getAll()
 
-        if (!isConfigured || !user) {
-          // Offline or not logged in: show all projects
+        // Admin เห็นทุก project
+        if (!isConfigured || !user || role === 'admin') {
           setProjects(allProjects)
           return
         }
