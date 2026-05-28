@@ -92,9 +92,10 @@ function buildBars(p: PlanningProject, holidays: Set<string>): TimelineBar[] {
     })
   }
 
-  // Testing: testDate → uatDate
-  if (testDate && uatDate) {
-    bars.push({ type: 'testing', startIso: testDate, endIso: uatDate, isMarker: false })
+  // Testing: testDate → uatDate (ถ้าไม่มี uatDate ใช้ goLiveDate แทน)
+  const testingEnd = uatDate ?? goLiveDate
+  if (testDate && testingEnd && testDate <= testingEnd) {
+    bars.push({ type: 'testing', startIso: testDate, endIso: testingEnd, isMarker: false })
   }
 
   // UAT marker
