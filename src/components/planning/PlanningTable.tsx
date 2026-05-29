@@ -3,12 +3,14 @@ import { ArrowUp, ArrowDown, AlertTriangle } from 'lucide-react'
 import type { PlanningProject, PlanningSortField, PlanningSortState } from '../../types/planning'
 import { getUrgencyFlags } from '../../types/planning'
 import type { Employee } from '../../types/index'
+import { ALL_STATUSES } from './PlanningView'
 
 interface Props {
   rows: PlanningProject[]
   sort: PlanningSortState
   onSort: (field: PlanningSortField) => void
   onAssignTester: (id: string, tester: string) => void
+  onUpdateStatus: (id: string, status: string) => void
   onUpdateTestingPercent: (id: string, value: number | null) => void
   onUpdateEstimateDay: (id: string, value: number | null) => void
   employees: Employee[]
@@ -325,10 +327,55 @@ function EstimateDayCell({
   )
 }
 
+// ── StatusCell ────────────────────────────────────────────────────────────────
+
+function StatusCell({ row, onUpdateStatus }: {
+  row: PlanningProject
+  onUpdateStatus: (id: string, status: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setEditing(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [])
+
+  if (!editing) {
+    return (
+      <span
+        onClick={() => setEditing(true)}
+        className="cursor-pointer block px-1 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-slate-600 whitespace-nowrap text-xs"
+        title="Click to edit status"
+      >
+        {row.status || <span className="text-gray-300 dark:text-slate-600 italic">—</span>}
+      </span>
+    )
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <select
+        autoFocus
+        defaultValue={row.status}
+        onChange={e => { onUpdateStatus(row.id, e.target.value); setEditing(false) }}
+        onBlur={() => setEditing(false)}
+        className="w-56 border border-indigo-400 rounded px-1 py-0.5 text-xs outline-none bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-200 cursor-pointer"
+      >
+        <option value="">— เลือก Status —</option>
+        {ALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+      </select>
+    </div>
+  )
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export function PlanningTable({
-  rows, sort, onSort, onAssignTester,
+  rows, sort, onSort, onAssignTester, onUpdateStatus,
   onUpdateTestingPercent, onUpdateEstimateDay,
   employees, pendingEditIds, today,
 }: Props) {
@@ -441,7 +488,9 @@ export function PlanningTable({
                 </td>
 
                 {/* Status */}
-                <td className={`${tdBase} whitespace-nowrap`}>{row.status || '—'}</td>
+                <td className={tdBase}>
+                  <StatusCell row={row} onUpdateStatus={onUpdateStatus} />
+                </td>
 
                 {/* Test Lead */}
                 <td className={`${tdBase} whitespace-nowrap`}>{row.testLead || '—'}</td>

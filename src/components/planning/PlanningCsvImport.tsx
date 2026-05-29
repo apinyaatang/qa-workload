@@ -10,8 +10,7 @@ import type {
   ConflictField,
   FieldConflict,
 } from '../../types/planning'
-import { parsePlanningCsv } from '../../utils/planningCsvParser'
-import { calcTestDate } from '../../utils/planningCsvParser'
+import { parsePlanningCsv, validateRequiredColumns, calcTestDate } from '../../utils/planningCsvParser'
 import { planningDb } from '../../lib/planningDb'
 import { useApp } from '../../context/AppContext'
 
@@ -154,6 +153,19 @@ export function PlanningCsvImport({ existingProjects, onImportComplete, onPrevie
     const reader = new FileReader()
     reader.onload = e => {
       const text = e.target?.result as string
+
+      // ── Validate required columns before parsing ──────────────────────────────
+      const missingCols = validateRequiredColumns(text)
+      if (missingCols.length > 0) {
+        setParseError(
+          `ไฟล์ CSV ไม่ถูกต้อง — ไม่พบ column ที่จำเป็น: ${missingCols.map(c => `"${c}"`).join(', ')}\n` +
+          `กรุณาตรวจสอบว่า header row มี column ครบถ้วน หรือดาวน์โหลด Template เพื่อใช้เป็นแบบ`
+        )
+        setRows([])
+        setStep('upload')
+        return
+      }
+
       const parsed = parsePlanningCsv(text, { holidays: holidaySet })
 
       if (parsed.parseError) {

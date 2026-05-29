@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Upload, Loader2, AlertCircle, X, LayoutList, Users, CalendarClock, UserX, ClipboardList, Save,
+  Upload, Loader2, AlertCircle, X, LayoutList, Users, CalendarClock, UserX, ClipboardList, Save, XCircle,
 } from 'lucide-react'
 import type {
   PlanningProject,
@@ -22,6 +22,45 @@ import { calcTestDate } from '../../utils/planningCsvParser'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
+export const ALL_STATUSES = [
+  'Cancel : Cancel from customer',
+  'Control : Handover to App Support Team',
+  'Define : Kick off with customer',
+  'Define : On Business Requirement',
+  'Go Live : Commercial Go live',
+  'Go Live : PROD Go live',
+  'Implement : Hold / Wait for Customer Feedback',
+  'Implement : On Development',
+  'Implement : On SIT/UAT with Customer',
+  'Implement : On Testing',
+  'Implement : UAT Sign off',
+  'Implement : Wait for Deployment',
+  'Planning : Internal Kick off project with team',
+  'Planning : Wait for development',
+  'Transition : Monitoring After Go live',
+]
+
+const ACTIVE_STATUSES = [
+  'Define : Kick off with customer',
+  'Define : On Business Requirement',
+  'Implement : On Development',
+  'Implement : On SIT/UAT with Customer',
+  'Implement : On Testing',
+  'Implement : UAT Sign off',
+  'Implement : Wait for Deployment',
+  'Planning : Internal Kick off project with team',
+  'Planning : Wait for development',
+]
+
+const CLOSED_STATUSES = [
+  'Cancel : Cancel from customer',
+  'Control : Handover to App Support Team',
+  'Go Live : Commercial Go live',
+  'Go Live : PROD Go live',
+  'Implement : Hold / Wait for Customer Feedback',
+  'Transition : Monitoring After Go live',
+]
+
 const EMPTY_FILTERS: PlanningFiltersType = {
   search: '',
   iterations:   [],
@@ -35,21 +74,15 @@ const EMPTY_FILTERS: PlanningFiltersType = {
   goLiveDateTo: '',
 }
 
-// Default statuses shown in Tester Workload tab (active / in-progress items)
-const WORKLOAD_DEFAULT_STATUSES: string[] = [
-  'Define : Kick off with customer',
-  'Define : On Business Requirement',
-  'Implement : On Development',
-  'Implement : On SIT/UAT with Customer',
-  'Implement : On Testing',
-  'Implement : Wait for Deployment',
-  'Planning : Internal Kick off project with team',
-  'Planning : Wait for development',
-]
+// Default filters: pre-select Active statuses for both Table and Workload tabs
+const ACTIVE_FILTERS: PlanningFiltersType = {
+  ...EMPTY_FILTERS,
+  statuses: ACTIVE_STATUSES,
+}
 
 const DEFAULT_SORT: PlanningSortState = { field: 'goLiveDate', dir: 'asc' }
 
-type Tab = 'table' | 'workload'
+type Tab = 'table' | 'workload' | 'closed'
 
 // ── Filter logic ───────────────────────────────────────────────────────────────
 
@@ -234,7 +267,7 @@ export default function PlanningView() {
   const [error, setError] = useState<string | null>(null)
 
   const [tab, setTab] = useState<Tab>('table')
-  const [filters, setFilters] = useState<PlanningFiltersType>(EMPTY_FILTERS)
+  const [filters, setFilters] = useState<PlanningFiltersType>(ACTIVE_FILTERS)
   const [sort, setSort] = useState<PlanningSortState>(DEFAULT_SORT)
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('none')
   const [showImport, setShowImport] = useState(false)
@@ -251,23 +284,6 @@ export default function PlanningView() {
     setTab('table')                         // land on Table tab to show filtered rows
     setPlanningInitialTester(null)           // consume & clear the signal
   }, [planningInitialTester, setPlanningInitialTester])
-
-  // ── Pre-fill default status filter when switching to Tester Workload tab ──────
-  // Wait for data to load first, then intersect with statuses that exist in data
-  // so we never end up with a filter that matches nothing.
-
-  useEffect(() => {
-    if (tab !== 'workload') return
-    if (loading || projects.length === 0) return
-
-    setFilters(f => {
-      if (f.statuses.length > 0) return f   // user already has a selection — don't override
-      const available = new Set(projects.map(p => p.status))
-      const matched = WORKLOAD_DEFAULT_STATUSES.filter(s => available.has(s))
-      // If none of the defaults exist in the data, fall back to showing everything (empty = all)
-      return { ...f, statuses: matched }
-    })
-  }, [tab, loading, projects])
 
   // ── Load data ────────────────────────────────────────────────────────────────
 
@@ -326,11 +342,16 @@ export default function PlanningView() {
 
   // ── Save all pending edits to DB ─────────────────────────────────────────────
 
+  function handleUpdateStatus(id: string, status: string) {
+    stageEdit(id, { status })
+  }
+
   const FIELD_TO_DB: Record<string, string> = {
     tester:          'tester',
     testingPercent:  'testing_percent',
     testEstimateDay: 'test_estimate_day',
     testDate:        'test_date',
+    status:          'status',
   }
 
   async function handleSave() {
@@ -376,6 +397,12 @@ export default function PlanningView() {
 
   // Gantt rows = same data (Gantt has its own internal group sort)
   const ganttRows = filteredRows
+
+  // Closed/cancelled rows — bypasses active status filter, reads raw projects
+  const closedRows = useMemo(
+    () => applySort(projects.filter(p => CLOSED_STATUSES.includes(p.status)), sort),
+    [projects, sort]
+  )
 
   // ── Urgency summary — always from full base (not filtered) ───────────────────
 
@@ -502,15 +529,23 @@ export default function PlanningView() {
           icon={<Users size={14} />}
           label="Tester Workload"
         />
+        <TabButton
+          active={tab === 'closed'}
+          onClick={() => setTab('closed')}
+          icon={<XCircle size={14} />}
+          label="Task Close/Cancel"
+        />
       </div>
 
-      {/* Filters */}
-      <PlanningFilters
-        projects={projects}
-        filters={filters}
-        onChange={setFilters}
-        onClear={() => setFilters(EMPTY_FILTERS)}
-      />
+      {/* Filters — ซ่อนเมื่ออยู่ที่ Tab Closed */}
+      {tab !== 'closed' && (
+        <PlanningFilters
+          projects={projects}
+          filters={filters}
+          onChange={setFilters}
+          onClear={() => setFilters(ACTIVE_FILTERS)}
+        />
+      )}
 
       {/* Loading state */}
       {loading && (
@@ -546,6 +581,7 @@ export default function PlanningView() {
               sort={sort}
               onSort={handleSort}
               onAssignTester={handleAssignTester}
+              onUpdateStatus={handleUpdateStatus}
               onUpdateTestingPercent={handleUpdateTestingPercent}
               onUpdateEstimateDay={handleUpdateEstimateDay}
               employees={employees}
@@ -558,6 +594,20 @@ export default function PlanningView() {
               projects={ganttRows}
               holidays={holidaySet}
               employees={employees}
+              today={today}
+            />
+          )}
+          {tab === 'closed' && (
+            <PlanningTable
+              rows={closedRows}
+              sort={sort}
+              onSort={handleSort}
+              onAssignTester={handleAssignTester}
+              onUpdateStatus={handleUpdateStatus}
+              onUpdateTestingPercent={handleUpdateTestingPercent}
+              onUpdateEstimateDay={handleUpdateEstimateDay}
+              employees={employees}
+              pendingEditIds={pendingEditIds}
               today={today}
             />
           )}
