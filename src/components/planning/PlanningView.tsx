@@ -74,15 +74,23 @@ const EMPTY_FILTERS: PlanningFiltersType = {
   goLiveDateTo: '',
 }
 
-// Default filters: pre-select Active statuses for both Table and Workload tabs
-const ACTIVE_FILTERS: PlanningFiltersType = {
-  ...EMPTY_FILTERS,
-  statuses: ACTIVE_STATUSES,
-}
-
 const DEFAULT_SORT: PlanningSortState = { field: 'goLiveDate', dir: 'asc' }
 
 type Tab = 'table' | 'workload' | 'closed'
+
+// ── Status normalisation (trim spaces around colon for flexible matching) ──────
+
+function normaliseStatus(s: string): string {
+  return s.trim().replace(/\s*:\s*/g, ':').toLowerCase()
+}
+
+function statusMatch(a: string, b: string): boolean {
+  return normaliseStatus(a) === normaliseStatus(b)
+}
+
+function statusInList(status: string, list: string[]): boolean {
+  return list.some(s => statusMatch(s, status))
+}
 
 // ── Filter logic ───────────────────────────────────────────────────────────────
 
@@ -95,11 +103,11 @@ function applyFilters(projects: PlanningProject[], filters: PlanningFiltersType)
       const haystack = [p.projectName, p.feature, p.tester, p.testLead].join(' ').toLowerCase()
       if (!haystack.includes(q)) return false
     }
-    // Multi-select filters (empty array = no filter)
-    if (filters.iterations.length  && !filters.iterations.includes(p.iteration))   return false
-    if (filters.statuses.length    && !filters.statuses.includes(p.status))         return false
-    if (filters.testers.length     && !filters.testers.includes(p.tester))          return false
-    if (filters.testLeads.length   && !filters.testLeads.includes(p.testLead))      return false
+    // Multi-select filters (empty array = no filter) — normalised status match
+    if (filters.iterations.length  && !filters.iterations.includes(p.iteration))       return false
+    if (filters.statuses.length    && !statusInList(p.status, filters.statuses))       return false
+    if (filters.testers.length     && !filters.testers.includes(p.tester))             return false
+    if (filters.testLeads.length   && !filters.testLeads.includes(p.testLead))         return false
     // Single-select
     if (filters.priority && p.priority !== filters.priority) return false
     // Date ranges
@@ -267,7 +275,7 @@ export default function PlanningView() {
   const [error, setError] = useState<string | null>(null)
 
   const [tab, setTab] = useState<Tab>('table')
-  const [filters, setFilters] = useState<PlanningFiltersType>(ACTIVE_FILTERS)
+  const [filters, setFilters] = useState<PlanningFiltersType>(EMPTY_FILTERS)
   const [sort, setSort] = useState<PlanningSortState>(DEFAULT_SORT)
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('none')
   const [showImport, setShowImport] = useState(false)
@@ -276,13 +284,24 @@ export default function PlanningView() {
   const [pendingEdits, setPendingEdits] = useState<Map<string, Partial<PlanningProject>>>(new Map())
   const [saving, setSaving] = useState(false)
 
+  // ── Apply active status filter once data loads (intersect with actual statuses) ──
+  const [activeFilterApplied, setActiveFilterApplied] = useState(false)
+
+  useEffect(() => {
+    if (loading || projects.length === 0 || activeFilterApplied) return
+    const available = new Set(projects.map(p => normaliseStatus(p.status)))
+    const matched = ACTIVE_STATUSES.filter(s => available.has(normaliseStatus(s)))
+    setFilters(f => ({ ...f, statuses: matched.length > 0 ? matched : [] }))
+    setActiveFilterApplied(true)
+  }, [loading, projects, activeFilterApplied])
+
   // ── Apply initial tester filter when navigated from Monitor and Assign ──────
 
   useEffect(() => {
     if (!planningInitialTester) return
     setFilters(f => ({ ...f, testers: [planningInitialTester] }))
-    setTab('table')                         // land on Table tab to show filtered rows
-    setPlanningInitialTester(null)           // consume & clear the signal
+    setTab('table')
+    setPlanningInitialTester(null)
   }, [planningInitialTester, setPlanningInitialTester])
 
   // ── Load data ────────────────────────────────────────────────────────────────
@@ -398,9 +417,9 @@ export default function PlanningView() {
   // Gantt rows = same data (Gantt has its own internal group sort)
   const ganttRows = filteredRows
 
-  // Closed/cancelled rows — bypasses active status filter, reads raw projects
+  // Closed/cancelled rows — normalised match against CLOSED_STATUSES
   const closedRows = useMemo(
-    () => applySort(projects.filter(p => CLOSED_STATUSES.includes(p.status)), sort),
+    () => applySort(projects.filter(p => statusInList(p.status, CLOSED_STATUSES)), sort),
     [projects, sort]
   )
 
@@ -543,7 +562,7 @@ export default function PlanningView() {
           projects={projects}
           filters={filters}
           onChange={setFilters}
-          onClear={() => setFilters(ACTIVE_FILTERS)}
+          onClear={() => { setFilters(EMPTY_FILTERS); setActiveFilterApplied(false) }}
         />
       )}
 
