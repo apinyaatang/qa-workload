@@ -138,7 +138,14 @@ function mapRow(
     goLiveDate,
     uatDate,
     testingPercent,
-    testerFlag:       norm['tester flag']?.trim()      ?? '',
+    testerFlag:       (() => {
+      const raw = norm['tester flag']?.trim() ?? ''
+      if (!raw) return [] as string[]
+      if (raw.startsWith('[')) {
+        try { const p = JSON.parse(raw); return Array.isArray(p) ? p : [raw] } catch { return [raw] }
+      }
+      return [raw]
+    })(),
     testerNote:       norm['tester note']?.trim()      ?? '',
     testEstimateDay,
     testDate,

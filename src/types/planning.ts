@@ -14,7 +14,7 @@ export interface PlanningProject {
   goLiveDate: string | null   // ISO date YYYY-MM-DD
   uatDate: string | null
   testingPercent: number | null
-  testerFlag: string
+  testerFlag: string[]
   testerNote: string
   testEstimateDay: number | null
   testDate: string | null     // calculated

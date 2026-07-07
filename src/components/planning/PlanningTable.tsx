@@ -1,22 +1,58 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowUp, ArrowDown, AlertTriangle } from 'lucide-react'
+import { ArrowUp, ArrowDown, AlertTriangle, ChevronDown } from 'lucide-react'
 import type { PlanningProject, PlanningSortField, PlanningSortState } from '../../types/planning'
 import { getUrgencyFlags } from '../../types/planning'
 import type { Employee } from '../../types/index'
-import { ALL_STATUSES } from './PlanningView'
 
-interface Props {
-  rows: PlanningProject[]
-  sort: PlanningSortState
-  onSort: (field: PlanningSortField) => void
-  onAssignTester: (id: string, tester: string) => void
-  onUpdateStatus: (id: string, status: string) => void
-  onUpdateTestingPercent: (id: string, value: number | null) => void
-  onUpdateEstimateDay: (id: string, value: number | null) => void
-  employees: Employee[]
-  pendingEditIds: Set<string>
-  today: Date
+// ── Column definitions ─────────────────────────────────────────────────────────
+
+type ColKey =
+  | 'no' | 'id' | 'iteration' | 'projectName' | 'itemType' | 'feature'
+  | 'tags' | 'status' | 'testLead' | 'priority' | 'tester' | 'goLiveDate'
+  | 'uatDate' | 'testingPercent' | 'testerFlag' | 'testerNote' | 'testEstimateDay'
+  | 'testDate' | 'remarkToPmos' | 'pm' | 'baNote' | 'quotationNo' | 'epicNo'
+
+interface ColDef {
+  key: ColKey
+  label: string
+  field?: PlanningSortField
+  sticky?: boolean
+  hideable: boolean
 }
+
+const COLUMNS_DEF: ColDef[] = [
+  { key: 'no',             label: '#',              hideable: false },
+  { key: 'id',             label: 'ID',             hideable: false, sticky: true },
+  { key: 'iteration',      label: 'Iteration',      hideable: true },
+  { key: 'projectName',    label: 'Project Name',   hideable: true },
+  { key: 'itemType',       label: 'Item Type',      hideable: true },
+  { key: 'feature',        label: 'Feature',        hideable: true },
+  { key: 'tags',           label: 'Tags',           hideable: true },
+  { key: 'status',         label: 'Status',         hideable: true },
+  { key: 'testLead',       label: 'Test Lead',      hideable: true },
+  { key: 'priority',       label: 'Priority',       field: 'priority',        hideable: true },
+  { key: 'tester',         label: 'Tester',         hideable: true },
+  { key: 'goLiveDate',     label: 'Go Live Date',   field: 'goLiveDate',      hideable: true },
+  { key: 'uatDate',        label: 'UAT Date',       field: 'uatDate',         hideable: true },
+  { key: 'testingPercent', label: 'Testing %',      field: 'testingPercent',  hideable: true },
+  { key: 'testerFlag',     label: 'Tester Flag',    hideable: true },
+  { key: 'testerNote',     label: 'Tester Note',    hideable: true },
+  { key: 'testEstimateDay',label: 'Est. (day)',      field: 'testEstimateDay', hideable: true },
+  { key: 'testDate',       label: 'Test Date',      field: 'testDate',        hideable: true },
+  { key: 'remarkToPmos',   label: 'Remark to PMOs', hideable: true },
+  { key: 'pm',             label: 'PM',             hideable: true },
+  { key: 'baNote',         label: 'BA Note',        hideable: true },
+  { key: 'quotationNo',    label: 'Quotation No.',  hideable: true },
+  { key: 'epicNo',         label: 'Epic No.',       hideable: true },
+]
+
+export const HIDEABLE_COLUMNS = COLUMNS_DEF
+  .filter(c => c.hideable)
+  .map(c => ({ key: c.key as string, label: c.label }))
+
+const SORTABLE_COLUMNS: PlanningSortField[] = [
+  'testDate', 'uatDate', 'goLiveDate', 'priority', 'testingPercent', 'testEstimateDay',
+]
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -45,48 +81,28 @@ const PRIORITY_BADGE: Record<string, string> = {
   '': 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 border border-gray-200 dark:border-slate-600',
 }
 
-const SORTABLE_COLUMNS: PlanningSortField[] = [
-  'testDate', 'uatDate', 'goLiveDate', 'priority', 'testingPercent', 'testEstimateDay',
-]
+// ── Props ──────────────────────────────────────────────────────────────────────
 
-type ColDef = {
-  label: string
-  field?: PlanningSortField
-  sticky?: boolean
+interface Props {
+  rows: PlanningProject[]
+  sort: PlanningSortState
+  onSort: (field: PlanningSortField) => void
+  onAssignTester: (id: string, tester: string) => void
+  onUpdateTestingPercent: (id: string, value: number | null) => void
+  onUpdateEstimateDay: (id: string, value: number | null) => void
+  onUpdateTesterFlag: (id: string, values: string[]) => void
+  onUpdateTesterNote: (id: string, value: string) => void
+  testerFlags: string[]
+  employees: Employee[]
+  pendingEditIds: Set<string>
+  hiddenCols: Set<string>
+  today: Date
 }
-
-const COLUMNS: ColDef[] = [
-  { label: '#' },
-  { label: 'ID', sticky: true },
-  { label: 'Iteration' },
-  { label: 'Project Name' },
-  { label: 'Item Type' },
-  { label: 'Feature' },
-  { label: 'Tags' },
-  { label: 'Status' },
-  { label: 'Test Lead' },
-  { label: 'Priority', field: 'priority' },
-  { label: 'Tester' },
-  { label: 'Go Live Date', field: 'goLiveDate' },
-  { label: 'UAT Date', field: 'uatDate' },
-  { label: 'Testing %', field: 'testingPercent' },
-  { label: 'Tester Flag' },
-  { label: 'Est. (day)', field: 'testEstimateDay' },
-  { label: 'Test Date', field: 'testDate' },
-  { label: 'Remark to PMOs' },
-  { label: 'PM' },
-  { label: 'BA Note' },
-  { label: 'Quotation No.' },
-  { label: 'Epic No.' },
-]
 
 // ── Tester dropdown cell ───────────────────────────────────────────────────────
 
 function TesterCell({
-  row,
-  onAssignTester,
-  hasMissingTester,
-  employees,
+  row, onAssignTester, hasMissingTester, employees,
 }: {
   row: PlanningProject
   onAssignTester: (id: string, tester: string) => void
@@ -98,23 +114,18 @@ function TesterCell({
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Close on outside click
   useEffect(() => {
     if (!open) return
     function handleClick(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-        setSearch('')
+        setOpen(false); setSearch('')
       }
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [open])
 
-  // Focus search input when opened
-  useEffect(() => {
-    if (open) inputRef.current?.focus()
-  }, [open])
+  useEffect(() => { if (open) inputRef.current?.focus() }, [open])
 
   const activeEmployees = employees.filter(e => e.isActive)
   const filtered = activeEmployees.filter(e => {
@@ -126,8 +137,7 @@ function TesterCell({
 
   function select(name: string) {
     onAssignTester(row.id, name)
-    setOpen(false)
-    setSearch('')
+    setOpen(false); setSearch('')
   }
 
   if (!open) {
@@ -164,7 +174,6 @@ function TesterCell({
         className="w-full border border-blue-400 rounded px-2 py-1 text-xs focus:outline-none dark:bg-slate-700 dark:text-slate-200"
       />
       <div className="absolute top-full left-0 mt-0.5 w-full min-w-[200px] max-h-48 overflow-y-auto bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded shadow-lg z-30">
-        {/* Clear/Unassign option */}
         <button
           onClick={() => select('')}
           className="w-full text-left px-3 py-1.5 text-xs text-gray-400 dark:text-slate-500 italic hover:bg-gray-50 dark:hover:bg-slate-700 border-b border-gray-100 dark:border-slate-700"
@@ -186,9 +195,7 @@ function TesterCell({
                 }`}
               >
                 <span>{baseName}</span>
-                {e.nickname && (
-                  <span className="ml-1.5 text-gray-400 dark:text-slate-500">({e.nickname})</span>
-                )}
+                {e.nickname && <span className="ml-1.5 text-gray-400 dark:text-slate-500">({e.nickname})</span>}
               </button>
             )
           })
@@ -198,11 +205,10 @@ function TesterCell({
   )
 }
 
-// ── Inline-edit testing percent cell ──────────────────────────────────────────
+// ── Testing % cell ─────────────────────────────────────────────────────────────
 
 function TestingPercentCell({
-  row,
-  onUpdateTestingPercent,
+  row, onUpdateTestingPercent,
 }: {
   row: PlanningProject
   onUpdateTestingPercent: (id: string, value: number | null) => void
@@ -248,10 +254,8 @@ function TestingPercentCell({
           <div className="flex-1 h-1.5 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden min-w-[50px]">
             <div
               className={`h-full rounded-full transition-all ${
-                row.testingPercent >= 100
-                  ? 'bg-green-500'
-                  : row.testingPercent >= 50
-                  ? 'bg-blue-500'
+                row.testingPercent >= 100 ? 'bg-green-500'
+                  : row.testingPercent >= 50 ? 'bg-blue-500'
                   : 'bg-orange-400'
               }`}
               style={{ width: `${Math.min(100, row.testingPercent)}%` }}
@@ -268,12 +272,10 @@ function TestingPercentCell({
   )
 }
 
-// ── Inline-edit estimate day cell ──────────────────────────────────────────────
+// ── Estimate day cell ──────────────────────────────────────────────────────────
 
 function EstimateDayCell({
-  row,
-  onUpdateEstimateDay,
-  isMissingEstimate,
+  row, onUpdateEstimateDay, isMissingEstimate,
 }: {
   row: PlanningProject
   onUpdateEstimateDay: (id: string, value: number | null) => void
@@ -317,8 +319,7 @@ function EstimateDayCell({
     >
       {isMissingEstimate ? (
         <span className="flex items-center gap-1 text-amber-600">
-          <AlertTriangle size={12} />
-          —
+          <AlertTriangle size={12} />—
         </span>
       ) : (
         <span>{row.testEstimateDay != null ? `${row.testEstimateDay}d` : '—'}</span>
@@ -327,47 +328,130 @@ function EstimateDayCell({
   )
 }
 
-// ── StatusCell ────────────────────────────────────────────────────────────────
+// ── Tester Flag multi-select cell ──────────────────────────────────────────────
 
-function StatusCell({ row, onUpdateStatus }: {
+function TesterFlagCell({
+  row, masterFlags, onUpdateTesterFlag,
+}: {
   row: PlanningProject
-  onUpdateStatus: (id: string, status: string) => void
+  masterFlags: string[]
+  onUpdateTesterFlag: (id: string, values: string[]) => void
 }) {
-  const [editing, setEditing] = useState(false)
+  const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const selected: string[] = Array.isArray(row.testerFlag) ? row.testerFlag : []
 
   useEffect(() => {
+    if (!open) return
     function handle(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setEditing(false)
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', handle)
     return () => document.removeEventListener('mousedown', handle)
-  }, [])
+  }, [open])
 
-  if (!editing) {
-    return (
-      <span
-        onClick={() => setEditing(true)}
-        className="cursor-pointer block px-1 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-slate-600 whitespace-nowrap text-xs"
-        title="Click to edit status"
-      >
-        {row.status || <span className="text-gray-300 dark:text-slate-600 italic">—</span>}
-      </span>
-    )
+  function toggle(flag: string) {
+    const next = selected.includes(flag)
+      ? selected.filter(f => f !== flag)
+      : [...selected, flag]
+    onUpdateTesterFlag(row.id, next)
   }
 
   return (
     <div ref={ref} className="relative">
-      <select
-        autoFocus
-        defaultValue={row.status}
-        onChange={e => { onUpdateStatus(row.id, e.target.value); setEditing(false) }}
-        onBlur={() => setEditing(false)}
-        className="w-56 border border-indigo-400 rounded px-1 py-0.5 text-xs outline-none bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-200 cursor-pointer"
+      <div
+        onClick={() => setOpen(o => !o)}
+        className="cursor-pointer flex items-start gap-1 rounded px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-slate-600 min-w-[120px]"
+        title="Click to edit Tester Flag"
       >
-        <option value="">— เลือก Status —</option>
-        {ALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-      </select>
+        <div className="flex flex-wrap gap-0.5 flex-1 max-w-[200px]">
+          {selected.length === 0 ? (
+            <span className="text-gray-400 dark:text-slate-500 italic text-[11px]">—</span>
+          ) : (
+            selected.map(f => (
+              <span key={f} className="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded text-[10px] whitespace-nowrap">
+                {f}
+              </span>
+            ))
+          )}
+        </div>
+        <ChevronDown size={11} className="text-gray-400 dark:text-slate-500 shrink-0 mt-0.5" />
+      </div>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-0.5 z-30 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg shadow-lg min-w-[200px] max-h-64 overflow-y-auto">
+          {masterFlags.map(flag => (
+            <label
+              key={flag}
+              className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(flag)}
+                onChange={() => toggle(flag)}
+                className="w-3 h-3 accent-indigo-600"
+              />
+              <span className="text-xs text-gray-700 dark:text-slate-200">{flag}</span>
+            </label>
+          ))}
+          {selected.length > 0 && (
+            <div className="border-t border-gray-100 dark:border-slate-700 px-3 py-1.5">
+              <button
+                onClick={() => { onUpdateTesterFlag(row.id, []); setOpen(false) }}
+                className="text-[11px] text-red-500 hover:underline"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Tester Note inline-edit cell ───────────────────────────────────────────────
+
+function TesterNoteCell({
+  row, onUpdateTesterNote,
+}: {
+  row: PlanningProject
+  onUpdateTesterNote: (id: string, value: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState(row.testerNote ?? '')
+
+  if (editing) {
+    return (
+      <textarea
+        autoFocus
+        value={val}
+        rows={3}
+        onChange={e => setVal(e.target.value)}
+        onBlur={() => {
+          onUpdateTesterNote(row.id, val.trim())
+          setEditing(false)
+        }}
+        onKeyDown={e => {
+          if (e.key === 'Escape') { setVal(row.testerNote ?? ''); setEditing(false) }
+        }}
+        className="w-full min-w-[200px] border border-blue-400 rounded px-2 py-1 text-xs focus:outline-none dark:bg-slate-700 dark:text-slate-200 resize-none"
+        placeholder="Add note..."
+      />
+    )
+  }
+
+  return (
+    <div
+      onClick={() => { setVal(row.testerNote ?? ''); setEditing(true) }}
+      className="cursor-pointer rounded px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-slate-600 max-w-[220px] min-w-[120px]"
+      title={row.testerNote || 'Click to add note'}
+    >
+      {row.testerNote ? (
+        <span className="block truncate text-xs text-gray-700 dark:text-slate-200">{row.testerNote}</span>
+      ) : (
+        <span className="text-gray-400 dark:text-slate-500 italic text-[11px]">Add note…</span>
+      )}
     </div>
   )
 }
@@ -375,10 +459,14 @@ function StatusCell({ row, onUpdateStatus }: {
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export function PlanningTable({
-  rows, sort, onSort, onAssignTester, onUpdateStatus,
+  rows, sort, onSort, onAssignTester,
   onUpdateTestingPercent, onUpdateEstimateDay,
-  employees, pendingEditIds, today,
+  onUpdateTesterFlag, onUpdateTesterNote,
+  testerFlags, employees, pendingEditIds, hiddenCols, today,
 }: Props) {
+  const vis = (key: string) => !hiddenCols.has(key)
+  const visibleCount = COLUMNS_DEF.filter(c => vis(c.key)).length
+
   function SortIcon({ field }: { field: PlanningSortField }) {
     if (sort.field !== field) return <span className="text-gray-300 dark:text-slate-600 ml-1">↕</span>
     return sort.dir === 'asc'
@@ -395,7 +483,8 @@ export function PlanningTable({
       <table className="min-w-full border-collapse text-sm">
         <thead>
           <tr>
-            {COLUMNS.map((col, ci) => {
+            {COLUMNS_DEF.map((col, ci) => {
+              if (!vis(col.key)) return null
               const sortable = col.field && SORTABLE_COLUMNS.includes(col.field)
               return (
                 <th
@@ -415,7 +504,7 @@ export function PlanningTable({
         <tbody>
           {rows.length === 0 && (
             <tr>
-              <td colSpan={COLUMNS.length} className="py-12 text-center text-sm text-gray-400 dark:text-slate-500">
+              <td colSpan={visibleCount} className="py-12 text-center text-sm text-gray-400 dark:text-slate-500">
                 No records match the current filters.
               </td>
             </tr>
@@ -429,12 +518,10 @@ export function PlanningTable({
             const isMissingEstimate = flags.includes('missing-estimate')
             const isPending = pendingEditIds.has(row.id)
 
-            // Row background priority: critical > golive-near > uat-near > missing-tester
             let rowBg = ''
             if (isMissingTester) rowBg = 'bg-red-100 dark:bg-red-900/25'
             if (isUatNear)       rowBg = 'bg-amber-100 dark:bg-amber-900/25'
             if (isGoLiveNear)    rowBg = 'bg-orange-100 dark:bg-orange-900/25'
-            // pending edit overrides all backgrounds
             if (isPending)       rowBg = 'bg-yellow-50 dark:bg-yellow-900/20'
 
             const leftBorder = isPending
@@ -449,131 +536,129 @@ export function PlanningTable({
 
             return (
               <tr key={row.id} className={`${rowBg} ${leftBorder} hover:bg-blue-50/40 dark:hover:bg-slate-700/50 transition-colors`}>
-                {/* # */}
-                <td className={`${tdBase} text-gray-400 dark:text-slate-500 text-center w-10`}>{idx + 1}</td>
-
-                {/* ID — sticky */}
-                <td
-                  className={`${tdBase} sticky left-0 z-10 font-mono text-xs text-blue-700 dark:text-blue-300 whitespace-nowrap shadow-[2px_0_4px_-1px_rgba(0,0,0,0.07)] ${rowBg || 'bg-white dark:bg-slate-800'}`}
-                >
-                  {row.id}
-                  {isPending && (
-                    <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-yellow-400 align-middle" title="มีการแก้ไขที่ยังไม่บันทึก" />
-                  )}
-                </td>
-
-                {/* Iteration */}
-                <td className={`${tdBase} whitespace-nowrap`}>{row.iteration || '—'}</td>
-
-                {/* Project Name */}
-                <td className={`${tdBase} max-w-[180px]`}>
-                  <span className="block truncate" title={row.projectName}>{row.projectName}</span>
-                </td>
-
-                {/* Item Type */}
-                <td className={`${tdBase} whitespace-nowrap`}>{row.itemType || '—'}</td>
-
-                {/* Feature */}
-                <td className={`${tdBase} max-w-[140px]`}>
-                  <span className="block truncate" title={row.feature}>{row.feature || '—'}</span>
-                </td>
-
-                {/* Tags */}
-                <td className={tdBase}>
-                  {row.tags ? (
-                    <span className="inline-block px-2 py-0.5 rounded-full bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 text-[11px] whitespace-nowrap">
-                      {row.tags}
+                {vis('no') && (
+                  <td className={`${tdBase} text-gray-400 dark:text-slate-500 text-center w-10`}>{idx + 1}</td>
+                )}
+                {vis('id') && (
+                  <td className={`${tdBase} sticky left-0 z-10 font-mono text-xs text-blue-700 dark:text-blue-300 whitespace-nowrap shadow-[2px_0_4px_-1px_rgba(0,0,0,0.07)] ${rowBg || 'bg-white dark:bg-slate-800'}`}>
+                    {row.id}
+                    {isPending && (
+                      <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-yellow-400 align-middle" title="มีการแก้ไขที่ยังไม่บันทึก" />
+                    )}
+                  </td>
+                )}
+                {vis('iteration') && (
+                  <td className={`${tdBase} whitespace-nowrap`}>{row.iteration || '—'}</td>
+                )}
+                {vis('projectName') && (
+                  <td className={`${tdBase} max-w-[180px]`}>
+                    <span className="block truncate" title={row.projectName}>{row.projectName}</span>
+                  </td>
+                )}
+                {vis('itemType') && (
+                  <td className={`${tdBase} whitespace-nowrap`}>{row.itemType || '—'}</td>
+                )}
+                {vis('feature') && (
+                  <td className={`${tdBase} max-w-[140px]`}>
+                    <span className="block truncate" title={row.feature}>{row.feature || '—'}</span>
+                  </td>
+                )}
+                {vis('tags') && (
+                  <td className={tdBase}>
+                    {row.tags ? (
+                      <span className="inline-block px-2 py-0.5 rounded-full bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 text-[11px] whitespace-nowrap">
+                        {row.tags}
+                      </span>
+                    ) : '—'}
+                  </td>
+                )}
+                {vis('status') && (
+                  <td className={`${tdBase} whitespace-nowrap`}>
+                    <span className="text-xs">{row.status || '—'}</span>
+                  </td>
+                )}
+                {vis('testLead') && (
+                  <td className={`${tdBase} whitespace-nowrap`}>{row.testLead || '—'}</td>
+                )}
+                {vis('priority') && (
+                  <td className={tdBase}>
+                    {row.priority ? (
+                      <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold whitespace-nowrap ${PRIORITY_BADGE[row.priority] ?? PRIORITY_BADGE['']}`}>
+                        {row.priority}
+                      </span>
+                    ) : '—'}
+                  </td>
+                )}
+                {vis('tester') && (
+                  <td className={tdBase}>
+                    <TesterCell
+                      row={row}
+                      onAssignTester={onAssignTester}
+                      hasMissingTester={isMissingTester}
+                      employees={employees}
+                    />
+                  </td>
+                )}
+                {vis('goLiveDate') && (
+                  <td className={`${tdBase} whitespace-nowrap`}>
+                    <span className={goLiveNearHighlight ? 'font-semibold text-orange-600' : ''}>
+                      {formatDate(row.goLiveDate)}
                     </span>
-                  ) : '—'}
-                </td>
-
-                {/* Status */}
-                <td className={tdBase}>
-                  <StatusCell row={row} onUpdateStatus={onUpdateStatus} />
-                </td>
-
-                {/* Test Lead */}
-                <td className={`${tdBase} whitespace-nowrap`}>{row.testLead || '—'}</td>
-
-                {/* Priority */}
-                <td className={tdBase}>
-                  {row.priority ? (
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold whitespace-nowrap ${
-                        PRIORITY_BADGE[row.priority] ?? PRIORITY_BADGE['']
-                      }`}
-                    >
-                      {row.priority}
+                  </td>
+                )}
+                {vis('uatDate') && (
+                  <td className={`${tdBase} whitespace-nowrap`}>
+                    <span className={uatNearHighlight ? 'font-semibold text-amber-600' : ''}>
+                      {formatDate(row.uatDate)}
                     </span>
-                  ) : '—'}
-                </td>
-
-                {/* Tester */}
-                <td className={tdBase}>
-                  <TesterCell
-                    row={row}
-                    onAssignTester={onAssignTester}
-                    hasMissingTester={isMissingTester}
-                    employees={employees}
-                  />
-                </td>
-
-                {/* Go Live Date */}
-                <td className={`${tdBase} whitespace-nowrap`}>
-                  <span className={goLiveNearHighlight ? 'font-semibold text-orange-600' : ''}>
-                    {formatDate(row.goLiveDate)}
-                  </span>
-                </td>
-
-                {/* UAT Date */}
-                <td className={`${tdBase} whitespace-nowrap`}>
-                  <span className={uatNearHighlight ? 'font-semibold text-amber-600' : ''}>
-                    {formatDate(row.uatDate)}
-                  </span>
-                </td>
-
-                {/* Testing % */}
-                <td className={`${tdBase} min-w-[90px]`}>
-                  <TestingPercentCell row={row} onUpdateTestingPercent={onUpdateTestingPercent} />
-                </td>
-
-                {/* Tester Flag */}
-                <td className={`${tdBase} whitespace-nowrap`}>{row.testerFlag || '—'}</td>
-
-                {/* Test Estimate */}
-                <td className={`${tdBase} whitespace-nowrap text-center`}>
-                  <EstimateDayCell row={row} onUpdateEstimateDay={onUpdateEstimateDay} isMissingEstimate={isMissingEstimate} />
-                </td>
-
-                {/* Test Date */}
-                <td className={`${tdBase} whitespace-nowrap`}>
-                  <span
-                    className={`font-semibold ${
-                      testDatePast ? 'text-red-600' : 'text-gray-800 dark:text-slate-100'
-                    }`}
-                  >
-                    {formatDate(row.testDate)}
-                  </span>
-                </td>
-
-                {/* Remark to PMOs */}
-                <td className={`${tdBase} max-w-[150px]`}>
-                  <span className="block truncate" title={row.remarkToPmos}>{row.remarkToPmos || '—'}</span>
-                </td>
-
-                {/* PM */}
-                <td className={`${tdBase} whitespace-nowrap`}>{row.pm || '—'}</td>
-
-                {/* BA Note */}
-                <td className={`${tdBase} max-w-[150px]`}>
-                  <span className="block truncate" title={row.baNote}>{row.baNote || '—'}</span>
-                </td>
-
-                {/* Quotation No. */}
-                <td className={`${tdBase} whitespace-nowrap`}>{row.quotationNo || '—'}</td>
-
-                {/* Epic No. */}
-                <td className={`${tdBase} whitespace-nowrap`}>{row.epicNo || '—'}</td>
+                  </td>
+                )}
+                {vis('testingPercent') && (
+                  <td className={`${tdBase} min-w-[90px]`}>
+                    <TestingPercentCell row={row} onUpdateTestingPercent={onUpdateTestingPercent} />
+                  </td>
+                )}
+                {vis('testerFlag') && (
+                  <td className={`${tdBase}`}>
+                    <TesterFlagCell row={row} masterFlags={testerFlags} onUpdateTesterFlag={onUpdateTesterFlag} />
+                  </td>
+                )}
+                {vis('testerNote') && (
+                  <td className={`${tdBase}`}>
+                    <TesterNoteCell row={row} onUpdateTesterNote={onUpdateTesterNote} />
+                  </td>
+                )}
+                {vis('testEstimateDay') && (
+                  <td className={`${tdBase} whitespace-nowrap text-center`}>
+                    <EstimateDayCell row={row} onUpdateEstimateDay={onUpdateEstimateDay} isMissingEstimate={isMissingEstimate} />
+                  </td>
+                )}
+                {vis('testDate') && (
+                  <td className={`${tdBase} whitespace-nowrap`}>
+                    <span className={`font-semibold ${testDatePast ? 'text-red-600' : 'text-gray-800 dark:text-slate-100'}`}>
+                      {formatDate(row.testDate)}
+                    </span>
+                  </td>
+                )}
+                {vis('remarkToPmos') && (
+                  <td className={`${tdBase} max-w-[150px]`}>
+                    <span className="block truncate" title={row.remarkToPmos}>{row.remarkToPmos || '—'}</span>
+                  </td>
+                )}
+                {vis('pm') && (
+                  <td className={`${tdBase} whitespace-nowrap`}>{row.pm || '—'}</td>
+                )}
+                {vis('baNote') && (
+                  <td className={`${tdBase} max-w-[150px]`}>
+                    <span className="block truncate" title={row.baNote}>{row.baNote || '—'}</span>
+                  </td>
+                )}
+                {vis('quotationNo') && (
+                  <td className={`${tdBase} whitespace-nowrap`}>{row.quotationNo || '—'}</td>
+                )}
+                {vis('epicNo') && (
+                  <td className={`${tdBase} whitespace-nowrap`}>{row.epicNo || '—'}</td>
+                )}
               </tr>
             )
           })}

@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Upload, Loader2, AlertCircle, X, LayoutList, Users, CalendarClock, UserX, ClipboardList, Save, XCircle,
+  Upload, Loader2, AlertCircle, X, LayoutList, Users, CalendarClock, UserX, ClipboardList,
+  Save, XCircle, Settings2, Eye,
 } from 'lucide-react'
 import type {
   PlanningProject,
@@ -14,7 +15,7 @@ import { getUrgencyFlags, PRIORITY_ORDER } from '../../types/planning'
 import { planningDb } from '../../lib/planningDb'
 
 import { PlanningFilters } from './PlanningFilters'
-import { PlanningTable } from './PlanningTable'
+import { PlanningTable, HIDEABLE_COLUMNS } from './PlanningTable'
 import TesterGanttView from './TesterGanttView'
 import { PlanningCsvImport } from './PlanningCsvImport'
 import { useApp } from '../../context/AppContext'
@@ -280,9 +281,46 @@ export default function PlanningView() {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('none')
   const [showImport, setShowImport] = useState(false)
 
+  // ── Tester flags master list ─────────────────────────────────────────────────
+  const [testerFlags, setTesterFlags] = useState<string[]>([])
+
+  // ── Column visibility (persisted to localStorage) ────────────────────────────
+  const [hiddenCols, setHiddenCols] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('wiq:hidden-cols')
+      return saved ? new Set(JSON.parse(saved) as string[]) : new Set()
+    } catch { return new Set() }
+  })
+  const [showColMenu, setShowColMenu] = useState(false)
+  const colMenuRef = useRef<HTMLDivElement>(null)
+
   // ── Pending edits (staged, not yet saved to DB) ──────────────────────────────
   const [pendingEdits, setPendingEdits] = useState<Map<string, Partial<PlanningProject>>>(new Map())
   const [saving, setSaving] = useState(false)
+
+  // ── Load tester flags from master table ─────────────────────────────────────
+  useEffect(() => {
+    planningDb.getTesterFlags().then(setTesterFlags)
+  }, [])
+
+  // ── Close column menu on outside click ──────────────────────────────────────
+  useEffect(() => {
+    if (!showColMenu) return
+    function handle(e: MouseEvent) {
+      if (colMenuRef.current && !colMenuRef.current.contains(e.target as Node)) setShowColMenu(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [showColMenu])
+
+  function toggleCol(key: string) {
+    setHiddenCols(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      localStorage.setItem('wiq:hidden-cols', JSON.stringify([...next]))
+      return next
+    })
+  }
 
   // ── Apply active status filter once data loads (intersect with actual statuses) ──
   const [activeFilterApplied, setActiveFilterApplied] = useState(false)
@@ -359,18 +397,23 @@ export default function PlanningView() {
     stageEdit(id, { testEstimateDay: value, testDate: newTestDate })
   }
 
-  // ── Save all pending edits to DB ─────────────────────────────────────────────
-
-  function handleUpdateStatus(id: string, status: string) {
-    stageEdit(id, { status })
+  function handleUpdateTesterFlag(id: string, values: string[]) {
+    stageEdit(id, { testerFlag: values })
   }
+
+  function handleUpdateTesterNote(id: string, value: string) {
+    stageEdit(id, { testerNote: value })
+  }
+
+  // ── Save all pending edits to DB ─────────────────────────────────────────────
 
   const FIELD_TO_DB: Record<string, string> = {
     tester:          'tester',
     testingPercent:  'testing_percent',
     testEstimateDay: 'test_estimate_day',
     testDate:        'test_date',
-    status:          'status',
+    testerFlag:      'tester_flag',
+    testerNote:      'tester_note',
   }
 
   async function handleSave() {
@@ -381,7 +424,12 @@ export default function PlanningView() {
         const dbFields: Record<string, unknown> = {}
         for (const [k, v] of Object.entries(patch)) {
           const col = FIELD_TO_DB[k]
-          if (col) dbFields[col] = v
+          if (col) {
+            // Serialize string[] to JSON string for tester_flag (TEXT column)
+            dbFields[col] = Array.isArray(v)
+              ? ((v as string[]).length > 0 ? JSON.stringify(v) : null)
+              : v
+          }
         }
         await planningDb.updateFields(id, dbFields)
       }
@@ -454,7 +502,58 @@ export default function PlanningView() {
           <h1 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">QA Workload</h1>
           <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{projects.length} projects loaded</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Column visibility toggle */}
+          <div className="relative" ref={colMenuRef}>
+            <button
+              onClick={() => setShowColMenu(s => !s)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                showColMenu || hiddenCols.size > 0
+                  ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300'
+                  : 'bg-white dark:bg-slate-700 border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-600'
+              }`}
+            >
+              <Settings2 size={14} />
+              Columns
+              {hiddenCols.size > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
+                  -{hiddenCols.size}
+                </span>
+              )}
+            </button>
+
+            {showColMenu && (
+              <div className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg shadow-xl p-3 min-w-[210px]">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-gray-500 dark:text-slate-400">Show / Hide Columns</p>
+                  <button
+                    onClick={() => {
+                      setHiddenCols(new Set())
+                      localStorage.removeItem('wiq:hidden-cols')
+                    }}
+                    className="flex items-center gap-1 text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    <Eye size={11} />
+                    Show all
+                  </button>
+                </div>
+                <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
+                  {HIDEABLE_COLUMNS.map(col => (
+                    <label key={col.key} className="flex items-center gap-2 cursor-pointer py-0.5 rounded hover:bg-gray-50 dark:hover:bg-slate-700 px-1">
+                      <input
+                        type="checkbox"
+                        checked={!hiddenCols.has(col.key)}
+                        onChange={() => toggleCol(col.key)}
+                        className="w-3.5 h-3.5 accent-indigo-600"
+                      />
+                      <span className="text-xs text-gray-700 dark:text-slate-200">{col.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => setShowImport(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 shadow-sm transition-colors"
@@ -600,11 +699,14 @@ export default function PlanningView() {
               sort={sort}
               onSort={handleSort}
               onAssignTester={handleAssignTester}
-              onUpdateStatus={handleUpdateStatus}
               onUpdateTestingPercent={handleUpdateTestingPercent}
               onUpdateEstimateDay={handleUpdateEstimateDay}
+              onUpdateTesterFlag={handleUpdateTesterFlag}
+              onUpdateTesterNote={handleUpdateTesterNote}
+              testerFlags={testerFlags}
               employees={employees}
               pendingEditIds={pendingEditIds}
+              hiddenCols={hiddenCols}
               today={today}
             />
           )}
@@ -622,11 +724,14 @@ export default function PlanningView() {
               sort={sort}
               onSort={handleSort}
               onAssignTester={handleAssignTester}
-              onUpdateStatus={handleUpdateStatus}
               onUpdateTestingPercent={handleUpdateTestingPercent}
               onUpdateEstimateDay={handleUpdateEstimateDay}
+              onUpdateTesterFlag={handleUpdateTesterFlag}
+              onUpdateTesterNote={handleUpdateTesterNote}
+              testerFlags={testerFlags}
               employees={employees}
               pendingEditIds={pendingEditIds}
+              hiddenCols={hiddenCols}
               today={today}
             />
           )}

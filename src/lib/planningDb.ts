@@ -1,6 +1,22 @@
 import { supabase, isConfigured } from './supabase'
 import type { PlanningProject, PlanningImportResult } from '../types/planning'
 
+const FALLBACK_TESTER_FLAGS = [
+  'Delay from Other team', 'Follow up plan', 'Wait confirm', 'Can be postpone',
+  'No need Tester', 'Wait kickoff', 'Follow Feature', 'Testcase', 'On going',
+  'Test on plan', 'Test delay', 'Testing hold', 'Support UAT', 'Test Done',
+  'Deployed', 'Support PRD',
+]
+
+function parseTesterFlag(raw: unknown): string[] {
+  if (!raw) return []
+  if (Array.isArray(raw)) return raw as string[]
+  if (typeof raw === 'string') {
+    try { const p = JSON.parse(raw); return Array.isArray(p) ? p : [] } catch { return [] }
+  }
+  return []
+}
+
 function throwIf(error: unknown, ctx: string) {
   if (error) throw new Error(`[planningDb/${ctx}] ${(error as any).message}`)
 }
@@ -20,7 +36,7 @@ function toRow(p: PlanningProject) {
     go_live_date:     p.goLiveDate      || null,
     uat_date:         p.uatDate         || null,
     testing_percent:  p.testingPercent  ?? null,
-    tester_flag:      p.testerFlag      || null,
+    tester_flag:      (p.testerFlag && p.testerFlag.length > 0) ? JSON.stringify(p.testerFlag) : null,
     tester_note:      p.testerNote      || null,
     test_estimate_day:p.testEstimateDay ?? null,
     test_date:        p.testDate        || null,
@@ -48,7 +64,7 @@ function fromRow(r: any): PlanningProject {
     goLiveDate:       r.go_live_date     ?? null,
     uatDate:          r.uat_date         ?? null,
     testingPercent:   r.testing_percent  ?? null,
-    testerFlag:       r.tester_flag      ?? '',
+    testerFlag:       parseTesterFlag(r.tester_flag),
     testerNote:       r.tester_note      ?? '',
     testEstimateDay:  r.test_estimate_day ?? null,
     testDate:         r.test_date        ?? null,
@@ -139,5 +155,15 @@ export const planningDb = {
     const { error } = await (supabase as any)
       .from('planning_projects').update(fields).eq('id', id)
     throwIf(error, 'updateFields')
+  },
+
+  async getTesterFlags(): Promise<string[]> {
+    if (!isConfigured) return FALLBACK_TESTER_FLAGS
+    const { data, error } = await (supabase as any)
+      .from('master_tester_flags')
+      .select('value')
+      .order('sort_order', { ascending: true })
+    if (error) return FALLBACK_TESTER_FLAGS
+    return (data ?? []).map((r: any) => r.value as string)
   },
 }
