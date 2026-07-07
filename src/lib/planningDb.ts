@@ -1,7 +1,7 @@
 import { supabase, isConfigured } from './supabase'
 import type { PlanningProject, PlanningImportResult } from '../types/planning'
 
-const FALLBACK_TESTER_FLAGS = [
+export const FALLBACK_TESTER_FLAGS = [
   'Delay from Other team', 'Follow up plan', 'Wait confirm', 'Can be postpone',
   'No need Tester', 'Wait kickoff', 'Follow Feature', 'Testcase', 'On going',
   'Test on plan', 'Test delay', 'Testing hold', 'Support UAT', 'Test Done',
@@ -159,11 +159,17 @@ export const planningDb = {
 
   async getTesterFlags(): Promise<string[]> {
     if (!isConfigured) return FALLBACK_TESTER_FLAGS
-    const { data, error } = await (supabase as any)
-      .from('master_tester_flags')
-      .select('value')
-      .order('sort_order', { ascending: true })
-    if (error) return FALLBACK_TESTER_FLAGS
-    return (data ?? []).map((r: any) => r.value as string)
+    try {
+      const { data, error } = await (supabase as any)
+        .from('master_tester_flags')
+        .select('value')
+        .order('sort_order', { ascending: true })
+      if (error) return FALLBACK_TESTER_FLAGS
+      const result = (data ?? []).map((r: any) => r.value as string)
+      // If table exists but has no rows, use fallback
+      return result.length > 0 ? result : FALLBACK_TESTER_FLAGS
+    } catch {
+      return FALLBACK_TESTER_FLAGS
+    }
   },
 }

@@ -12,7 +12,7 @@ import type {
   PlanningImportResult,
 } from '../../types/planning'
 import { getUrgencyFlags, PRIORITY_ORDER } from '../../types/planning'
-import { planningDb } from '../../lib/planningDb'
+import { planningDb, FALLBACK_TESTER_FLAGS } from '../../lib/planningDb'
 
 import { PlanningFilters } from './PlanningFilters'
 import { PlanningTable, HIDEABLE_COLUMNS } from './PlanningTable'
@@ -281,8 +281,8 @@ export default function PlanningView() {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('none')
   const [showImport, setShowImport] = useState(false)
 
-  // ── Tester flags master list ─────────────────────────────────────────────────
-  const [testerFlags, setTesterFlags] = useState<string[]>([])
+  // ── Tester flags master list (initial = fallback so dropdown always has options) ──
+  const [testerFlags, setTesterFlags] = useState<string[]>(FALLBACK_TESTER_FLAGS)
 
   // ── Column visibility (persisted to localStorage) ────────────────────────────
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(() => {
