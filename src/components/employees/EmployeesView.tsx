@@ -48,11 +48,14 @@ function QaBadge({ status }: { status: QaWorkloadStatus }) {
 
 function getEmployeeQaData(
   emp: Employee,
+  allEmployees: Employee[],
   projects: PlanningProject[],
   periodDays: string[],   // working days in selected period
   holidays: Set<string>,
 ) {
-  const empMap = buildEmployeeMap([emp])
+  // Use the FULL employee map so nickname collisions resolve correctly
+  // (e.g. two employees with the same nickname won't steal each other's projects)
+  const empMap = buildEmployeeMap(allEmployees)
 
   // Find tester keys that resolve to this employee
   const allTesterKeys = [...new Set(projects.map(p => p.tester?.trim()).filter(Boolean) as string[])]
@@ -233,9 +236,15 @@ export default function EmployeesView() {
   const activeEmployees = useMemo(() => employees.filter(e => e.isActive), [employees])
 
   // Navigate to QA Workload with this employee pre-filtered
-  function handleCardClick(emp: Employee, allTasks: PlanningProject[]) {
-    // Use the actual tester string from planning data (exact match for the filter)
-    const testerKey = allTasks[0]?.tester?.trim() ?? `${emp.firstName} ${emp.lastName}`.trim()
+  function handleCardClick(emp: Employee) {
+    // Build full employee map so resolveEmployee disambiguates nickname collisions correctly
+    const fullEmpMap = buildEmployeeMap(activeEmployees)
+    // Find the first planning project whose tester string resolves to this specific employee
+    const match = planningProjects.find(
+      p => resolveEmployee(p.tester?.trim() ?? '', fullEmpMap)?.id === emp.id
+    )
+    const testerKey = match?.tester?.trim()
+      ?? `${emp.firstName} ${emp.lastName}${emp.nickname ? ` (${emp.nickname})` : ''}`.trim()
     setPlanningInitialTester(testerKey)
     setActiveView('planning')
   }
@@ -247,7 +256,7 @@ export default function EmployeesView() {
       .map(emp => ({
         emp,
         leaves:  leaveRecords.filter(l => l.employeeId === emp.id),
-        qa:      getEmployeeQaData(emp, planningProjects, periodDays, holidaySet),
+        qa:      getEmployeeQaData(emp, activeEmployees, planningProjects, periodDays, holidaySet),
       }))
       .sort((a, b) => {
         const sa = STATUS_SORT[a.qa.status] ?? 0
@@ -325,7 +334,7 @@ export default function EmployeesView() {
             return (
               <div
                 key={emp.id}
-                onClick={() => !leaveModalEmpId && handleCardClick(emp, qa.allTasks ?? [])}
+                onClick={() => !leaveModalEmpId && handleCardClick(emp)}
                 className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm p-5 hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-700 transition-all cursor-pointer group"
               >
                 {/* Header */}
