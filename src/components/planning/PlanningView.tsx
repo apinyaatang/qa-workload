@@ -243,6 +243,35 @@ export default function PlanningView() {
   const [pendingEdits, setPendingEdits] = useState<Map<string, Partial<PlanningProject>>>(new Map())
   const [saving, setSaving] = useState(false)
 
+  // ── Close column menu on outside click ──────────────────────────────────────
+  useEffect(() => {
+    if (!showColMenu) return
+    function handle(e: MouseEvent) {
+      if (colMenuRef.current && !colMenuRef.current.contains(e.target as Node)) setShowColMenu(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [showColMenu])
+
+  function toggleCol(key: string) {
+    setHiddenCols(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      localStorage.setItem('wiq:hidden-cols', JSON.stringify([...next]))
+      return next
+    })
+  }
+
+  // ── Apply active status filter once data loads (intersect with actual statuses) ──
+  const [activeFilterApplied, setActiveFilterApplied] = useState(false)
+
+  useEffect(() => {
+    if (loading || projects.length === 0 || activeFilterApplied) return
+    const available = new Set(projects.map(p => normaliseStatus(p.status)))
+    const matched = ACTIVE_STATUSES.filter(s => available.has(normaliseStatus(s)))
+    setFilters(f => ({ ...f, statuses: matched.length > 0 ? matched : [] }))
+    setActiveFilterApplied(true)
+  }, [loading, projects, activeFilterApplied])
   // ── Apply initial tester filter when navigated from Monitor and Assign ──────
 
   useEffect(() => {
@@ -275,8 +304,12 @@ export default function PlanningView() {
     setLoading(true)
     setError(null)
     try {
-      const data = await planningDb.getAll()
+      const [data, flags] = await Promise.all([
+        planningDb.getAll(),
+        planningDb.getTesterFlags(),
+      ])
       setProjects(data)
+      setTesterFlags(flags)
     } catch (err: any) {
       setError(err.message ?? 'Failed to load planning data.')
     } finally {

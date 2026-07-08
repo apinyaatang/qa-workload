@@ -331,7 +331,7 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
 
         {/* ── Scrollable timeline ── */}
         <div ref={scrollRef} className="flex-1 overflow-x-auto overflow-y-auto">
-          <div style={{ width: totalW, minWidth: totalW }}>
+          <div style={{ width: totalW, minWidth: totalW, position: 'relative' }}>
             {/* Month header */}
             <div className="flex border-b border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 sticky top-0 z-10" style={{ height: 28 }}>
               {monthSpans.map((span, i) => (
@@ -369,7 +369,7 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
               <div
                 className="absolute top-0 bottom-0 bg-blue-50/60 dark:bg-blue-900/20 pointer-events-none z-0"
                 style={{
-                  left: LEFT_W + colIndex(todayIso) * COL_W,
+                  left: colIndex(todayIso) * COL_W,
                   width: COL_W,
                 }}
               />

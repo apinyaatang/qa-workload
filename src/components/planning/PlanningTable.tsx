@@ -114,7 +114,7 @@ function TesterCell({
     if (open) inputRef.current?.focus()
   }, [open])
 
-  const activeEmployees = employees.filter(e => e.isActive)
+  const activeEmployees = employees.filter(e => e.isActive !== false)
   const filtered = activeEmployees.filter(e => {
     const fullName = `${e.firstName} ${e.lastName}`.toLowerCase()
     const nick = (e.nickname ?? '').toLowerCase()
