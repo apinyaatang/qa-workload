@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Upload, Loader2, AlertCircle, X, LayoutList, Users, CalendarClock, UserX, ClipboardList,
-  Save, XCircle, Settings2, Eye, Rocket,
+  Save, XCircle, Settings2, Eye, Rocket, Search,
 } from 'lucide-react'
 import type {
   PlanningProject,
@@ -152,6 +152,12 @@ function applySort(projects: PlanningProject[], sort: PlanningSortState): Planni
       case 'goLiveDate':
         cmp = (a.goLiveDate ?? '').localeCompare(b.goLiveDate ?? '')
         break
+      case 'tester':
+        cmp = (a.tester ?? '').localeCompare(b.tester ?? '')
+        break
+      case 'status':
+        cmp = (a.status ?? '').localeCompare(b.status ?? '')
+        break
     }
     return cmp * mult
   })
@@ -285,6 +291,8 @@ export default function PlanningView() {
   const [sort, setSort] = useState<PlanningSortState>(DEFAULT_SORT)
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('none')
   const [showImport, setShowImport] = useState(false)
+  const [closedSearch,   setClosedSearch]   = useState('')
+  const [deployedSearch, setDeployedSearch] = useState('')
 
   // ── Tester flags master list (initial = fallback so dropdown always has options) ──
   const [testerFlags, setTesterFlags] = useState<string[]>(FALLBACK_TESTER_FLAGS)
@@ -486,6 +494,20 @@ export default function PlanningView() {
     () => applySort(projects.filter(isDeployed), sort),
     [projects, sort]
   )
+
+  // Search filter helper for Closed / Deployed tabs (project name, tester, status)
+  function searchRows(rows: PlanningProject[], q: string): PlanningProject[] {
+    const s = q.trim().toLowerCase()
+    if (!s) return rows
+    return rows.filter(p =>
+      (p.projectName ?? '').toLowerCase().includes(s) ||
+      (p.tester      ?? '').toLowerCase().includes(s) ||
+      (p.status      ?? '').toLowerCase().includes(s)
+    )
+  }
+
+  const filteredClosedRows   = useMemo(() => searchRows(closedRows,   closedSearch),   [closedRows,   closedSearch])
+  const filteredDeployedRows = useMemo(() => searchRows(deployedRows, deployedSearch), [deployedRows, deployedSearch])
 
   // ── Urgency summary — always from full base (not filtered) ───────────────────
 
@@ -741,38 +763,54 @@ export default function PlanningView() {
             />
           )}
           {tab === 'closed' && (
-            <PlanningTable
-              rows={closedRows}
-              sort={sort}
-              onSort={handleSort}
-              onAssignTester={handleAssignTester}
-              onUpdateTestingPercent={handleUpdateTestingPercent}
-              onUpdateEstimateDay={handleUpdateEstimateDay}
-              onUpdateTesterFlag={handleUpdateTesterFlag}
-              onUpdateTesterNote={handleUpdateTesterNote}
-              testerFlags={testerFlags}
-              employees={employees}
-              pendingEditIds={pendingEditIds}
-              hiddenCols={hiddenCols}
-              today={today}
-            />
+            <>
+              <TabSearchBar
+                value={closedSearch}
+                onChange={setClosedSearch}
+                total={closedRows.length}
+                filtered={filteredClosedRows.length}
+              />
+              <PlanningTable
+                rows={filteredClosedRows}
+                sort={sort}
+                onSort={handleSort}
+                onAssignTester={handleAssignTester}
+                onUpdateTestingPercent={handleUpdateTestingPercent}
+                onUpdateEstimateDay={handleUpdateEstimateDay}
+                onUpdateTesterFlag={handleUpdateTesterFlag}
+                onUpdateTesterNote={handleUpdateTesterNote}
+                testerFlags={testerFlags}
+                employees={employees}
+                pendingEditIds={pendingEditIds}
+                hiddenCols={hiddenCols}
+                today={today}
+              />
+            </>
           )}
           {tab === 'deployed' && (
-            <PlanningTable
-              rows={deployedRows}
-              sort={sort}
-              onSort={handleSort}
-              onAssignTester={handleAssignTester}
-              onUpdateTestingPercent={handleUpdateTestingPercent}
-              onUpdateEstimateDay={handleUpdateEstimateDay}
-              onUpdateTesterFlag={handleUpdateTesterFlag}
-              onUpdateTesterNote={handleUpdateTesterNote}
-              testerFlags={testerFlags}
-              employees={employees}
-              pendingEditIds={pendingEditIds}
-              hiddenCols={hiddenCols}
-              today={today}
-            />
+            <>
+              <TabSearchBar
+                value={deployedSearch}
+                onChange={setDeployedSearch}
+                total={deployedRows.length}
+                filtered={filteredDeployedRows.length}
+              />
+              <PlanningTable
+                rows={filteredDeployedRows}
+                sort={sort}
+                onSort={handleSort}
+                onAssignTester={handleAssignTester}
+                onUpdateTestingPercent={handleUpdateTestingPercent}
+                onUpdateEstimateDay={handleUpdateEstimateDay}
+                onUpdateTesterFlag={handleUpdateTesterFlag}
+                onUpdateTesterNote={handleUpdateTesterNote}
+                testerFlags={testerFlags}
+                employees={employees}
+                pendingEditIds={pendingEditIds}
+                hiddenCols={hiddenCols}
+                today={today}
+              />
+            </>
           )}
         </>
       )}
@@ -827,6 +865,41 @@ const URGENCY_COLORS: Record<string, { wrap: string; dot: string }> = {
   amber:  { wrap: 'bg-amber-100 dark:bg-amber-900/30 border-amber-400 dark:border-amber-700 text-amber-800 dark:text-amber-300', dot: 'bg-amber-500' },
   orange: { wrap: 'bg-orange-100 dark:bg-orange-900/30 border-orange-400 dark:border-orange-700 text-orange-800 dark:text-orange-300', dot: 'bg-orange-500' },
   yellow: { wrap: 'bg-yellow-100 dark:bg-yellow-900/30 border-yellow-400 dark:border-yellow-700 text-yellow-800 dark:text-yellow-300', dot: 'bg-yellow-500' },
+}
+
+function TabSearchBar({
+  value, onChange, total, filtered,
+}: {
+  value: string
+  onChange: (v: string) => void
+  total: number
+  filtered: number
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="relative flex-1 max-w-sm">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 pointer-events-none" />
+        <input
+          type="text"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder="ค้นหา Project, Tester, Status…"
+          className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 outline-none focus:border-indigo-400 dark:focus:border-indigo-500"
+        />
+      </div>
+      {value && (
+        <button
+          onClick={() => onChange('')}
+          className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 underline"
+        >
+          ล้าง
+        </button>
+      )}
+      <span className="text-xs text-gray-400 dark:text-slate-500">
+        {value ? `${filtered} / ${total}` : `${total}`} รายการ
+      </span>
+    </div>
+  )
 }
 
 function FilterChip({

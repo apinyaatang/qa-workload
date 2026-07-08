@@ -74,6 +74,7 @@ export interface PlanningFilters {
 export type PlanningSortField =
   | 'testDate' | 'uatDate' | 'goLiveDate'
   | 'priority' | 'testingPercent' | 'testEstimateDay'
+  | 'tester' | 'status'
 
 export interface PlanningSortState {
   field: PlanningSortField

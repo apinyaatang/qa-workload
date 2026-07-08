@@ -28,10 +28,10 @@ const COLUMNS_DEF: ColDef[] = [
   { key: 'itemType',       label: 'Item Type',      hideable: true },
   { key: 'feature',        label: 'Feature',        hideable: true },
   { key: 'tags',           label: 'Tags',           hideable: true },
-  { key: 'status',         label: 'Status',         hideable: true },
+  { key: 'status',         label: 'Status',         field: 'status',  hideable: true },
   { key: 'testLead',       label: 'Test Lead',      hideable: true },
   { key: 'priority',       label: 'Priority',       field: 'priority',        hideable: true },
-  { key: 'tester',         label: 'Tester',         hideable: true },
+  { key: 'tester',         label: 'Tester',         field: 'tester',  hideable: true },
   { key: 'goLiveDate',     label: 'Go Live Date',   field: 'goLiveDate',      hideable: true },
   { key: 'uatDate',        label: 'UAT Date',       field: 'uatDate',         hideable: true },
   { key: 'testingPercent', label: 'Testing %',      field: 'testingPercent',  hideable: true },
@@ -52,6 +52,7 @@ export const HIDEABLE_COLUMNS = COLUMNS_DEF
 
 const SORTABLE_COLUMNS: PlanningSortField[] = [
   'testDate', 'uatDate', 'goLiveDate', 'priority', 'testingPercent', 'testEstimateDay',
+  'tester', 'status',
 ]
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
