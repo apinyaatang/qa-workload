@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Upload, Loader2, AlertCircle, X, LayoutList, Users, CalendarClock, UserX, ClipboardList,
-  Save, XCircle, Settings2, Eye,
+  Save, XCircle, Settings2, Eye, Rocket,
 } from 'lucide-react'
 import type {
   PlanningProject,
@@ -48,7 +48,6 @@ const ACTIVE_STATUSES = [
   'Implement : On SIT/UAT with Customer',
   'Implement : On Testing',
   'Implement : UAT Sign off',
-  'Implement : Wait for Deployment',
   'Planning : Internal Kick off project with team',
   'Planning : Wait for development',
 ]
@@ -77,7 +76,13 @@ const EMPTY_FILTERS: PlanningFiltersType = {
 
 const DEFAULT_SORT: PlanningSortState = { field: 'goLiveDate', dir: 'asc' }
 
-type Tab = 'table' | 'workload' | 'closed'
+type Tab = 'table' | 'workload' | 'closed' | 'deployed'
+
+// Projects that belong in the Deployed tab (hidden from Planning & Tester Workload)
+function isDeployed(p: PlanningProject): boolean {
+  return statusMatch(p.status, 'Implement : Wait for Deployment') ||
+    (p.testerFlag ?? []).some(f => f.toLowerCase() === 'deployed')
+}
 
 // ── Status normalisation (trim spaces around colon for flexible matching) ──────
 
@@ -317,16 +322,19 @@ export default function PlanningView() {
     })
   }
 
+  // ── Split deployed projects out early (used in activeFilterApplied effect below) ──
+  const mainProjectsForFilter = useMemo(() => projects.filter(p => !isDeployed(p)), [projects])
+
   // ── Apply active status filter once data loads (intersect with actual statuses) ──
   const [activeFilterApplied, setActiveFilterApplied] = useState(false)
 
   useEffect(() => {
     if (loading || projects.length === 0 || activeFilterApplied) return
-    const available = new Set(projects.map(p => normaliseStatus(p.status)))
+    const available = new Set(mainProjectsForFilter.map(p => normaliseStatus(p.status)))
     const matched = ACTIVE_STATUSES.filter(s => available.has(normaliseStatus(s)))
     setFilters(f => ({ ...f, statuses: matched.length > 0 ? matched : [] }))
     setActiveFilterApplied(true)
-  }, [loading, projects, activeFilterApplied])
+  }, [loading, projects, mainProjectsForFilter, activeFilterApplied])
 
   // ── Apply initial tester filter when navigated from Monitor and Assign ──────
 
@@ -442,10 +450,13 @@ export default function PlanningView() {
 
   // ── Filtered & sorted rows ───────────────────────────────────────────────────
 
-  // Base: search/dropdown filters applied (no sort yet)
+  // Projects excluded from Planning & Workload tabs (own Deployed tab)
+  const mainProjects = useMemo(() => projects.filter(p => !isDeployed(p)), [projects])
+
+  // Base: search/dropdown filters applied (no sort yet) — only non-deployed projects
   const baseFiltered = useMemo(
-    () => applyFilters(projects, filters),
-    [projects, filters]
+    () => applyFilters(mainProjects, filters),
+    [mainProjects, filters]
   )
 
   // Quick-filter + auto-sort applied to both Table and Gantt
@@ -467,6 +478,12 @@ export default function PlanningView() {
   // Closed/cancelled rows — normalised match against CLOSED_STATUSES
   const closedRows = useMemo(
     () => applySort(projects.filter(p => statusInList(p.status, CLOSED_STATUSES)), sort),
+    [projects, sort]
+  )
+
+  // Deployed tab: Status = "Implement : Wait for Deployment" OR testerFlag includes "Deployed"
+  const deployedRows = useMemo(
+    () => applySort(projects.filter(isDeployed), sort),
     [projects, sort]
   )
 
@@ -652,12 +669,18 @@ export default function PlanningView() {
           icon={<XCircle size={14} />}
           label="Task Close/Cancel"
         />
+        <TabButton
+          active={tab === 'deployed'}
+          onClick={() => setTab('deployed')}
+          icon={<Rocket size={14} />}
+          label={`Deployed${deployedRows.length > 0 ? ` (${deployedRows.length})` : ''}`}
+        />
       </div>
 
-      {/* Filters — ซ่อนเมื่ออยู่ที่ Tab Closed */}
-      {tab !== 'closed' && (
+      {/* Filters — ซ่อนเมื่ออยู่ที่ Tab Closed หรือ Deployed */}
+      {tab !== 'closed' && tab !== 'deployed' && (
         <PlanningFilters
-          projects={projects}
+          projects={mainProjects}
           filters={filters}
           onChange={setFilters}
           onClear={() => { setFilters(EMPTY_FILTERS); setActiveFilterApplied(false) }}
@@ -720,6 +743,23 @@ export default function PlanningView() {
           {tab === 'closed' && (
             <PlanningTable
               rows={closedRows}
+              sort={sort}
+              onSort={handleSort}
+              onAssignTester={handleAssignTester}
+              onUpdateTestingPercent={handleUpdateTestingPercent}
+              onUpdateEstimateDay={handleUpdateEstimateDay}
+              onUpdateTesterFlag={handleUpdateTesterFlag}
+              onUpdateTesterNote={handleUpdateTesterNote}
+              testerFlags={testerFlags}
+              employees={employees}
+              pendingEditIds={pendingEditIds}
+              hiddenCols={hiddenCols}
+              today={today}
+            />
+          )}
+          {tab === 'deployed' && (
+            <PlanningTable
+              rows={deployedRows}
               sort={sort}
               onSort={handleSort}
               onAssignTester={handleAssignTester}
