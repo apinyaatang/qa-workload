@@ -298,11 +298,6 @@ export default function PlanningView() {
   const [pendingEdits, setPendingEdits] = useState<Map<string, Partial<PlanningProject>>>(new Map())
   const [saving, setSaving] = useState(false)
 
-  // ── Load tester flags from master table ─────────────────────────────────────
-  useEffect(() => {
-    planningDb.getTesterFlags().then(setTesterFlags)
-  }, [])
-
   // ── Close column menu on outside click ──────────────────────────────────────
   useEffect(() => {
     if (!showColMenu) return
@@ -348,8 +343,12 @@ export default function PlanningView() {
     setLoading(true)
     setError(null)
     try {
-      const data = await planningDb.getAll()
+      const [data, flags] = await Promise.all([
+        planningDb.getAll(),
+        planningDb.getTesterFlags(),
+      ])
       setProjects(data)
+      setTesterFlags(flags)
     } catch (err: any) {
       setError(err.message ?? 'Failed to load planning data.')
     } finally {
