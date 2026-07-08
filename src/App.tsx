@@ -1,4 +1,4 @@
-import { AuthProvider, useAuth } from './context/AuthContext'
+import { AuthProvider } from './context/AuthContext'
 import { AppProvider, useApp } from './context/AppContext'
 import Sidebar from './components/layout/Sidebar'
 import Header from './components/layout/Header'
@@ -13,31 +13,11 @@ import ImportView from './components/import/ImportView'
 import PlanningView from './components/planning/PlanningView'
 import MyProjectsView from './components/myprojects/MyProjectsView'
 import ProjectProgressView from './components/progress/ProjectProgressView'
-import LoginPage from './components/auth/LoginPage'
 import { Loader2 } from 'lucide-react'
-import { isConfigured } from './lib/supabase'
 import './index.css'
 
 function AppContent() {
-  const { user, isLoading: authLoading } = useAuth()
   const { activeView, isLoading, isDarkMode, selectedProjectId } = useApp()
-
-  // Show auth loading screen
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 size={36} className="animate-spin text-indigo-600" />
-          <p className="text-sm text-gray-500 dark:text-slate-400 font-medium">กำลังตรวจสอบสิทธิ์...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Redirect to login if Supabase is configured and user is not authenticated
-  if (!user && isConfigured) {
-    return <LoginPage />
-  }
 
   function renderView() {
     switch (activeView) {

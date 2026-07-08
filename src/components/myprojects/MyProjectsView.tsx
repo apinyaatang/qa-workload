@@ -1,15 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { FolderKanban, Loader2, AlertCircle, Search } from 'lucide-react'
-import { useAuth } from '../../context/AuthContext'
-import { useApp } from '../../context/AppContext'
 import { planningDb } from '../../lib/planningDb'
-import { supabase, isConfigured } from '../../lib/supabase'
 import type { PlanningProject } from '../../types/planning'
 import ProjectCard from './ProjectCard'
 
 export default function MyProjectsView() {
-  const { user, role } = useAuth()
-  const { employees } = useApp()
   const [projects, setProjects] = useState<PlanningProject[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -21,36 +16,7 @@ export default function MyProjectsView() {
       setError(null)
       try {
         const allProjects = await planningDb.getAll()
-
-        // Admin เห็นทุก project
-        if (!isConfigured || !user || role === 'admin') {
-          setProjects(allProjects)
-          return
-        }
-
-        // Get tester names assigned to this staff
-        const { data: assignments } = await (supabase as any)
-          .from('staff_assignments')
-          .select('tester_name')
-          .eq('staff_id', user.id)
-
-        if (assignments && assignments.length > 0) {
-          const names = assignments.map((a: any) => a.tester_name.toLowerCase())
-          setProjects(allProjects.filter(p =>
-            p.tester && names.includes(p.tester.toLowerCase())
-          ))
-        } else {
-          // Fallback: match by employee name from employees list
-          const emp = employees.find(e => e.id === user?.id || e.employeeCode === user?.id)
-          if (emp) {
-            const fullName = `${emp.firstName} ${emp.lastName}`.toLowerCase()
-            setProjects(allProjects.filter(p =>
-              p.tester && p.tester.toLowerCase().includes(fullName)
-            ))
-          } else {
-            setProjects([])
-          }
-        }
+        setProjects(allProjects)
       } catch (err: any) {
         setError(err.message ?? 'ไม่สามารถโหลดข้อมูลได้')
       } finally {
@@ -58,7 +24,7 @@ export default function MyProjectsView() {
       }
     }
     load()
-  }, [user, employees])
+  }, [])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()

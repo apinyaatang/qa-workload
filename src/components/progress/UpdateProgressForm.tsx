@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Send, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
-import { useAuth } from '../../context/AuthContext'
 import { planningDb } from '../../lib/planningDb'
 import { progressDb } from '../../lib/progressDb'
 import { sendProgressToTeams } from '../../lib/teamsService'
@@ -23,7 +22,6 @@ function getProgressColor(pct: number): string {
 }
 
 export default function UpdateProgressForm({ project, adoSummary = [] }: Props) {
-  const { user } = useAuth()
   const [pct, setPct] = useState(project.testingPercent ?? 0)
   const [comment, setComment] = useState('')
   const [sendTeams, setSendTeams] = useState(false)
@@ -69,7 +67,7 @@ export default function UpdateProgressForm({ project, adoSummary = [] }: Props) 
           uatDate:        project.uatDate,
           goLiveDate:     project.goLiveDate,
           adoSummary:     adoSummary,
-          updatedBy:      user?.email ?? 'Unknown',
+          updatedBy:      'System',
           updatedAt:      new Date().toLocaleString('th-TH'),
         })
         sentToTeams = true
@@ -77,7 +75,7 @@ export default function UpdateProgressForm({ project, adoSummary = [] }: Props) 
 
       await progressDb.insert({
         planningId:     project.id,
-        staffId:        user?.id ?? 'offline',
+        staffId:        'offline',
         testingPercent: pct,
         comment:        comment.trim(),
         adoSnapshot,
