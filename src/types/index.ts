@@ -112,9 +112,14 @@ export interface AppState {
   selectedPeriod: Period
   activeView: ViewType
   selectedEmployeeId: string | null
+  selectedProjectId: string | null
 }
 
-export type ViewType = 'dashboard' | 'employees' | 'tasks' | 'adhoc-report' | 'individual' | 'settings' | 'import' | 'planning'
+export type ViewType =
+  | 'dashboard' | 'employees' | 'tasks' | 'adhoc-report'
+  | 'individual' | 'settings' | 'import' | 'planning'
+  | 'my-projects'
+  | 'project-progress'
 
 // ─── Master Project ───────────────────────────────────────────────────────────
 export type ProjectStatus = 'Active' | 'Inactive' | 'Completed'

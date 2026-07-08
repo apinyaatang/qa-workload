@@ -21,6 +21,7 @@ interface AppContextType extends AppState {
   setSelectedPeriod: (p: Period) => void
   setActiveView: (v: ViewType) => void
   setSelectedEmployeeId: (id: string | null) => void
+  setSelectedProjectId: (id: string | null) => void
   addTask: (task: Task) => void
   updateTask: (task: Task) => void
   refreshImport: (newTasks: Task[]) => void
@@ -62,6 +63,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [selectedPeriod,     setSelectedPeriod]     = useState<Period>(defaultPeriod)
   const [activeView,         setActiveView]         = useState<ViewType>('dashboard')
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null)
+  const [selectedProjectId,  setSelectedProjectId]  = useState<string | null>(null)
   const [isLoading,               setIsLoading]               = useState(isConfigured)
   const [dbError,                 setDbError]                 = useState<string | null>(null)
   const [isOnline,                setIsOnline]                = useState(isConfigured)
@@ -300,9 +302,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     <AppContext.Provider value={{
       employees, tasks, leaveRecords, publicHolidays,
       projects, importSessions,
-      selectedPeriod, activeView, selectedEmployeeId,
+      selectedPeriod, activeView, selectedEmployeeId, selectedProjectId,
       teamSummary, isLoading, dbError, isOnline,
-      setSelectedPeriod, setActiveView, setSelectedEmployeeId,
+      setSelectedPeriod, setActiveView, setSelectedEmployeeId, setSelectedProjectId,
       addTask, updateTask, refreshImport,
       addEmployee, updateEmployee, deleteEmployee,
       addProject, updateProject, deleteProject,
