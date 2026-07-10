@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Upload, Loader2, AlertCircle, X, LayoutList, Users, CalendarClock, UserX, ClipboardList,
-  Save, XCircle, Settings2, Eye, Rocket, Search,
+  Save, XCircle, Settings2, Eye, Rocket, Search, CalendarCheck, CheckCircle2,
 } from 'lucide-react'
 import type {
   PlanningProject,
@@ -165,7 +165,7 @@ function applySort(projects: PlanningProject[], sort: PlanningSortState): Planni
 
 // ── Urgency summary ────────────────────────────────────────────────────────────
 
-type QuickFilter = 'none' | 'near-uat' | 'near-golive' | 'missing-tester' | 'missing-estimate'
+type QuickFilter = 'none' | 'near-uat' | 'near-golive' | 'missing-tester' | 'missing-estimate' | 'near-testdate' | 'follow-plan'
 
 interface UrgencyCounts {
   overloaded: number
@@ -173,6 +173,8 @@ interface UrgencyCounts {
   nearGoLive: number
   missingTester: number
   missingEstimate: number
+  nearTestDate: number
+  followPlan: number
 }
 
 const NEAR_DAYS = 5   // window in calendar days
@@ -184,13 +186,35 @@ function isWithinDays(iso: string | null | undefined, today: Date, days: number)
   return diff >= 0 && diff <= days
 }
 
+// Near Test Date: testDate exists AND today < testDate - 1 day (at least 2 days before test) AND within NEAR_DAYS
+function isNearTestDate(p: PlanningProject, today: Date): boolean {
+  if (!p.testDate) return false
+  const diff = (new Date(p.testDate).getTime() - today.getTime()) / 86_400_000
+  return diff > 1 && diff <= NEAR_DAYS
+}
+
+// Follow Plan: no testDate AND approaching UAT (or GoLive if no UAT) by at least 5 days
+function isFollowPlan(p: PlanningProject, today: Date): boolean {
+  if (p.testDate?.trim()) return false
+  const refDate = p.uatDate ?? p.goLiveDate
+  if (!refDate) return false
+  const diff = (new Date(refDate).getTime() - today.getTime()) / 86_400_000
+  return diff >= 5
+}
+
 function getUrgencyCounts(projects: PlanningProject[], today: Date): UrgencyCounts {
-  const counts: UrgencyCounts = { overloaded: 0, nearUat: 0, nearGoLive: 0, missingTester: 0, missingEstimate: 0 }
+  const counts: UrgencyCounts = {
+    overloaded: 0, nearUat: 0, nearGoLive: 0,
+    missingTester: 0, missingEstimate: 0,
+    nearTestDate: 0, followPlan: 0,
+  }
   const testerLoad = new Map<string, number>()
 
   for (const p of projects) {
     if (isWithinDays(p.uatDate,    today, NEAR_DAYS)) counts.nearUat++
     if (isWithinDays(p.goLiveDate, today, NEAR_DAYS)) counts.nearGoLive++
+    if (isNearTestDate(p, today)) counts.nearTestDate++
+    if (isFollowPlan(p, today))   counts.followPlan++
     const flags = getUrgencyFlags(p, today)
     if (flags.includes('missing-tester'))   counts.missingTester++
     if (flags.includes('missing-estimate')) counts.missingEstimate++
@@ -247,6 +271,8 @@ function applyQuickFilter(rows: PlanningProject[], qf: QuickFilter, today: Date)
   }
   if (qf === 'missing-tester')   return rows.filter(p => !p.tester?.trim())
   if (qf === 'missing-estimate') return rows.filter(p => p.testEstimateDay == null)
+  if (qf === 'near-testdate')    return rows.filter(p => isNearTestDate(p, today))
+  if (qf === 'follow-plan')      return rows.filter(p => isFollowPlan(p, today))
   return rows
 }
 
@@ -659,6 +685,24 @@ export default function PlanningView() {
             color="yellow"
             onClick={() => setQuickFilter(q => q === 'missing-estimate' ? 'none' : 'missing-estimate')}
           />
+          <FilterChip
+            active={quickFilter === 'near-testdate'}
+            count={urgency.nearTestDate}
+            label="Near Test Date"
+            sublabel="2–5 วัน"
+            icon={<CalendarCheck size={13} />}
+            color="blue"
+            onClick={() => setQuickFilter(q => q === 'near-testdate' ? 'none' : 'near-testdate')}
+          />
+          <FilterChip
+            active={quickFilter === 'follow-plan'}
+            count={urgency.followPlan}
+            label="Follow Plan"
+            sublabel="≥ 5 วันก่อน UAT/GoLive"
+            icon={<CheckCircle2 size={13} />}
+            color="green"
+            onClick={() => setQuickFilter(q => q === 'follow-plan' ? 'none' : 'follow-plan')}
+          />
 
           {quickFilter !== 'none' && (
             <button
@@ -865,6 +909,8 @@ const URGENCY_COLORS: Record<string, { wrap: string; dot: string }> = {
   amber:  { wrap: 'bg-amber-100 dark:bg-amber-900/30 border-amber-400 dark:border-amber-700 text-amber-800 dark:text-amber-300', dot: 'bg-amber-500' },
   orange: { wrap: 'bg-orange-100 dark:bg-orange-900/30 border-orange-400 dark:border-orange-700 text-orange-800 dark:text-orange-300', dot: 'bg-orange-500' },
   yellow: { wrap: 'bg-yellow-100 dark:bg-yellow-900/30 border-yellow-400 dark:border-yellow-700 text-yellow-800 dark:text-yellow-300', dot: 'bg-yellow-500' },
+  blue:   { wrap: 'bg-blue-100 dark:bg-blue-900/30 border-blue-400 dark:border-blue-700 text-blue-800 dark:text-blue-300',       dot: 'bg-blue-500' },
+  green:  { wrap: 'bg-green-100 dark:bg-green-900/30 border-green-400 dark:border-green-700 text-green-800 dark:text-green-300', dot: 'bg-green-500' },
 }
 
 function TabSearchBar({
