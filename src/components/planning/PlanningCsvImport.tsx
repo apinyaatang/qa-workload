@@ -10,7 +10,7 @@ import type {
   ConflictField,
   FieldConflict,
 } from '../../types/planning'
-import { parsePlanningCsv, validateRequiredColumns, calcTestDate } from '../../utils/planningCsvParser'
+import { parsePlanningCsv, validateRequiredColumns } from '../../utils/planningCsvParser'
 import { planningDb } from '../../lib/planningDb'
 import { useApp } from '../../context/AppContext'
 
@@ -25,12 +25,8 @@ type Step = 'upload' | 'preview' | 'result'
 // Map: rowNo → per-field resolution ('file' = use imported value, 'db' = keep existing)
 type ResolutionMap = Map<number, Record<ConflictField, 'file' | 'db'>>
 
-const CONFLICT_FIELDS: ConflictField[] = ['tester', 'testingPercent', 'testEstimateDay']
-
 const FIELD_LABELS: Record<ConflictField, string> = {
   tester: 'Tester',
-  testingPercent: 'Testing %',
-  testEstimateDay: 'Est. (day)',
 }
 
 const PRIORITY_BADGE: Record<string, string> = {
@@ -47,10 +43,8 @@ function formatDate(iso: string | null | undefined): string {
   return `${d}/${m}/${y}`
 }
 
-function formatFieldValue(field: ConflictField, value: string | number | null): string {
+function formatFieldValue(_field: ConflictField, value: string | number | null): string {
   if (value == null || value === '') return '—'
-  if (field === 'testingPercent') return `${value}%`
-  if (field === 'testEstimateDay') return `${value}d`
   return String(value)
 }
 
@@ -180,24 +174,14 @@ export function PlanningCsvImport({ existingProjects, onImportComplete, onPrevie
         if (!willUpdate) return { ...row, willUpdate }
 
         const existing = existingProjectMap.get(row.data.id!)
-        const conflicts: FieldConflict[] = CONFLICT_FIELDS
-          .filter(f => {
-            const fileVal = row.data[f] ?? null
-            const dbVal   = existing?.[f] ?? null
-            return String(fileVal) !== String(dbVal)
-          })
-          .map(f => ({
-            field: f,
-            fileValue: (row.data as any)[f] ?? null,
-            dbValue:   existing ? (existing as any)[f] ?? null : null,
-          }))
+        const testerFile = row.data.tester ?? null
+        const testerDb   = existing?.tester ?? null
+        const conflicts: FieldConflict[] = String(testerFile) !== String(testerDb)
+          ? [{ field: 'tester', fileValue: testerFile, dbValue: testerDb }]
+          : []
 
         if (conflicts.length > 0) {
-          initialResolutions.set(row.rowNo, {
-            tester: 'file',
-            testingPercent: 'file',
-            testEstimateDay: 'file',
-          })
+          initialResolutions.set(row.rowNo, { tester: 'file' })
         }
 
         return { ...row, willUpdate, conflicts, existingData: existing }
@@ -248,19 +232,25 @@ export function PlanningCsvImport({ existingProjects, onImportComplete, onPrevie
     try {
       const projects = validRows.map(row => {
         const data = { ...row.data } as PlanningProject
-        const rowRes = resolutions.get(row.rowNo)
 
-        if (row.conflicts?.length && rowRes) {
-          for (const conflict of row.conflicts) {
-            if (rowRes[conflict.field] === 'db') {
-              ;(data as any)[conflict.field] = conflict.dbValue
-            }
+        if (row.willUpdate) {
+          const existing = existingProjectMap.get(row.data.id!)
+          if (existing) {
+            // Always keep DB values for these fields on update
+            data.testingPercent  = existing.testingPercent
+            data.testEstimateDay = existing.testEstimateDay
+            data.testerFlag      = existing.testerFlag
+            data.testerNote      = existing.testerNote
+            data.testDate        = existing.testDate
           }
-          // If est day resolved to DB, recalculate test_date
-          if (rowRes.testEstimateDay === 'db') {
-            data.testDate = calcTestDate(
-              data.uatDate, data.goLiveDate, data.testEstimateDay, holidaySet,
-            )
+
+          // Tester: apply conflict resolution (default = file, user may choose db)
+          const rowRes = resolutions.get(row.rowNo)
+          if (row.conflicts?.length && rowRes) {
+            const testerConflict = row.conflicts.find(c => c.field === 'tester')
+            if (testerConflict && rowRes.tester === 'db') {
+              data.tester = testerConflict.dbValue as string
+            }
           }
         }
 
@@ -413,8 +403,9 @@ export function PlanningCsvImport({ existingProjects, onImportComplete, onPrevie
             <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-amber-800 dark:text-amber-300 text-xs">
               <AlertTriangle size={14} className="shrink-0 mt-0.5" />
               <span>
-                พบ <strong>{conflictRows.length}</strong> แถวที่มีค่า Tester / Testing % / Est. (day) ไม่ตรงกับข้อมูลเดิม
-                กรุณาเลือก <strong>📄 (File)</strong> หรือ <strong>💾 (DB)</strong> สำหรับแต่ละ field ก่อนกด Confirm Import
+                พบ <strong>{conflictRows.length}</strong> แถวที่มีค่า Tester ไม่ตรงกับข้อมูลเดิม
+                กรุณาเลือก <strong>📄 (File)</strong> หรือ <strong>💾 (DB)</strong> สำหรับ Tester ก่อนกด Confirm Import
+                (Est., Testing %, Tester Flag, Tester Note, Test Date จะยึดค่าจาก DB ทั้งหมด)
               </span>
             </div>
           )}
@@ -488,48 +479,37 @@ export function PlanningCsvImport({ existingProjects, onImportComplete, onPrevie
 
                       <td className="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-slate-200 align-top">{formatDate(row.data.uatDate)}</td>
 
-                      {/* Est. (day) — show conflict toggle if needed */}
+                      {/* Est. (day) — UPDATE rows show DB value */}
                       <td className="px-3 py-2 whitespace-nowrap align-top">
-                        {(() => {
-                          const c = getConflict('testEstimateDay')
-                          if (c && rowRes) {
-                            return (
-                              <ConflictToggle
-                                conflict={c}
-                                choice={rowRes.testEstimateDay}
-                                onToggle={() => toggleResolution(row.rowNo, 'testEstimateDay')}
-                              />
-                            )
-                          }
-                          return (
-                            <span className="text-gray-700 dark:text-slate-200">
-                              {row.data.testEstimateDay != null ? `${row.data.testEstimateDay}d` : '—'}
-                            </span>
-                          )
-                        })()}
+                        {row.willUpdate && row.existingData ? (
+                          <span className="text-gray-700 dark:text-slate-200">
+                            {row.existingData.testEstimateDay != null ? `${row.existingData.testEstimateDay}d` : '—'}
+                          </span>
+                        ) : (
+                          <span className="text-gray-700 dark:text-slate-200">
+                            {row.data.testEstimateDay != null ? `${row.data.testEstimateDay}d` : '—'}
+                          </span>
+                        )}
                       </td>
 
-                      <td className="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-slate-200 align-top">{formatDate(row.data.testDate)}</td>
+                      {/* Test Date — UPDATE rows show DB value */}
+                      <td className="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-slate-200 align-top">
+                        {row.willUpdate && row.existingData
+                          ? formatDate(row.existingData.testDate)
+                          : formatDate(row.data.testDate)}
+                      </td>
 
-                      {/* Testing % — show conflict toggle if needed */}
+                      {/* Testing % — UPDATE rows show DB value */}
                       <td className="px-3 py-2 whitespace-nowrap align-top">
-                        {(() => {
-                          const c = getConflict('testingPercent')
-                          if (c && rowRes) {
-                            return (
-                              <ConflictToggle
-                                conflict={c}
-                                choice={rowRes.testingPercent}
-                                onToggle={() => toggleResolution(row.rowNo, 'testingPercent')}
-                              />
-                            )
-                          }
-                          return (
-                            <span className="text-gray-700 dark:text-slate-200">
-                              {row.data.testingPercent != null ? `${row.data.testingPercent}%` : '—'}
-                            </span>
-                          )
-                        })()}
+                        {row.willUpdate && row.existingData ? (
+                          <span className="text-gray-700 dark:text-slate-200">
+                            {row.existingData.testingPercent != null ? `${row.existingData.testingPercent}%` : '—'}
+                          </span>
+                        ) : (
+                          <span className="text-gray-700 dark:text-slate-200">
+                            {row.data.testingPercent != null ? `${row.data.testingPercent}%` : '—'}
+                          </span>
+                        )}
                       </td>
 
                       {/* Tester — show conflict toggle if needed */}

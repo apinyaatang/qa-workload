@@ -30,7 +30,7 @@ export interface PlanningProject {
 
 // ── CSV import ───────────────────────────────────────────────────────────────
 
-export type ConflictField = 'tester' | 'testingPercent' | 'testEstimateDay'
+export type ConflictField = 'tester'
 
 export interface FieldConflict {
   field: ConflictField
