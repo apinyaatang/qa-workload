@@ -205,8 +205,9 @@ export function TesterWorkload({ projects, selectedPeriodStart, selectedPeriodEn
                       </span>
                     )}
                     {p.testingPercent != null && (
-                      <div className="flex items-center gap-1">
-                        <div className="w-12 h-1.5 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden">
+                      <div className="flex items-center gap-1" title="Testing %">
+                        <span className="text-gray-400 dark:text-slate-500">Test:</span>
+                        <div className="w-14 h-1.5 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden">
                           <div
                             className={`h-full rounded-full ${
                               p.testingPercent >= 100
@@ -218,7 +219,12 @@ export function TesterWorkload({ projects, selectedPeriodStart, selectedPeriodEn
                             style={{ width: `${Math.min(100, p.testingPercent)}%` }}
                           />
                         </div>
-                        <span>{p.testingPercent}%</span>
+                        <span className={`font-medium ${
+                          p.testingPercent >= 100 ? 'text-green-600 dark:text-green-400'
+                          : p.testingPercent >= 50 ? 'text-blue-600 dark:text-blue-400'
+                          : p.testingPercent > 0  ? 'text-orange-500 dark:text-orange-400'
+                          : 'text-gray-400 dark:text-slate-500'
+                        }`}>{p.testingPercent}%</span>
                       </div>
                     )}
                   </div>

@@ -26,7 +26,7 @@ const COLUMNS_DEF: ColDef[] = [
   { key: 'iteration',      label: 'Iteration',      hideable: true },
   { key: 'projectName',    label: 'Project Name',   hideable: true },
   { key: 'itemType',       label: 'Item Type',      hideable: true },
-  { key: 'feature',        label: 'Feature',        hideable: true },
+  { key: 'feature',        label: 'Feature',        hideable: false },
   { key: 'tags',           label: 'Tags',           hideable: true },
   { key: 'status',         label: 'Status',         field: 'status',  hideable: true },
   { key: 'testLead',       label: 'Test Lead',      hideable: true },
