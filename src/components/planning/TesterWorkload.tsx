@@ -191,6 +191,28 @@ export function TesterWorkload({ projects, selectedPeriodStart, selectedPeriodEn
                     {p.projectName}
                   </span>
 
+                  {/* Testing % badge — shown when value is 0 or more (not null) */}
+                  {p.testingPercent != null && (
+                    <div className="flex items-center gap-1 shrink-0" title="Testing %">
+                      <div className="w-16 h-2 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${
+                            p.testingPercent >= 100 ? 'bg-green-500'
+                            : p.testingPercent >= 50 ? 'bg-blue-400'
+                            : 'bg-orange-400'
+                          }`}
+                          style={{ width: `${Math.min(100, p.testingPercent)}%` }}
+                        />
+                      </div>
+                      <span className={`text-[11px] font-semibold whitespace-nowrap ${
+                        p.testingPercent >= 100 ? 'text-green-600 dark:text-green-400'
+                        : p.testingPercent >= 50 ? 'text-blue-600 dark:text-blue-400'
+                        : p.testingPercent > 0  ? 'text-orange-500 dark:text-orange-400'
+                        : 'text-gray-500 dark:text-slate-400'
+                      }`}>{p.testingPercent}%</span>
+                    </div>
+                  )}
+
                   {/* Dates & estimate */}
                   <div className="flex items-center gap-3 shrink-0 text-[11px] text-gray-500 dark:text-slate-400">
                     <span title="Test Date">
@@ -203,29 +225,6 @@ export function TesterWorkload({ projects, selectedPeriodStart, selectedPeriodEn
                       <span className="text-gray-600 dark:text-slate-300 whitespace-nowrap">
                         {p.testEstimateDay}d
                       </span>
-                    )}
-                    {p.testingPercent != null && (
-                      <div className="flex items-center gap-1" title="Testing %">
-                        <span className="text-gray-400 dark:text-slate-500">Test:</span>
-                        <div className="w-14 h-1.5 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${
-                              p.testingPercent >= 100
-                                ? 'bg-green-500'
-                                : p.testingPercent >= 50
-                                ? 'bg-blue-400'
-                                : 'bg-orange-400'
-                            }`}
-                            style={{ width: `${Math.min(100, p.testingPercent)}%` }}
-                          />
-                        </div>
-                        <span className={`font-medium ${
-                          p.testingPercent >= 100 ? 'text-green-600 dark:text-green-400'
-                          : p.testingPercent >= 50 ? 'text-blue-600 dark:text-blue-400'
-                          : p.testingPercent > 0  ? 'text-orange-500 dark:text-orange-400'
-                          : 'text-gray-400 dark:text-slate-500'
-                        }`}>{p.testingPercent}%</span>
-                      </div>
                     )}
                   </div>
                 </div>
