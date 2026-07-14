@@ -324,6 +324,27 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
                       <p className="text-[10px] text-gray-400 dark:text-slate-500 truncate leading-tight">{p.feature}</p>
                     )}
                   </div>
+                  {/* Testing % mini bar */}
+                  {p.testingPercent != null && (
+                    <div className="shrink-0 flex items-center gap-1" title={`Testing: ${p.testingPercent}%`}>
+                      <div className="w-10 h-1.5 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${
+                            p.testingPercent >= 100 ? 'bg-green-500'
+                            : p.testingPercent >= 50 ? 'bg-blue-400'
+                            : 'bg-orange-400'
+                          }`}
+                          style={{ width: `${Math.min(100, p.testingPercent)}%` }}
+                        />
+                      </div>
+                      <span className={`text-[9px] font-semibold whitespace-nowrap ${
+                        p.testingPercent >= 100 ? 'text-green-600 dark:text-green-400'
+                        : p.testingPercent >= 50 ? 'text-blue-500 dark:text-blue-400'
+                        : p.testingPercent > 0  ? 'text-orange-500 dark:text-orange-400'
+                        : 'text-gray-400 dark:text-slate-500'
+                      }`}>{p.testingPercent}%</span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
