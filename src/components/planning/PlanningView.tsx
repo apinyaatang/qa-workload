@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Upload, Loader2, AlertCircle, X, LayoutList, Users, CalendarClock, UserX, ClipboardList,
-  Save, XCircle, Settings2, Eye, Rocket, Search, CalendarCheck, CheckCircle2,
+  Save, XCircle, Settings2, Eye, Rocket, Search, CalendarCheck, CheckCircle2, Clock,
 } from 'lucide-react'
 import type {
   PlanningProject,
@@ -76,12 +76,22 @@ const EMPTY_FILTERS: PlanningFiltersType = {
 
 const DEFAULT_SORT: PlanningSortState = { field: 'goLiveDate', dir: 'asc' }
 
-type Tab = 'table' | 'workload' | 'closed' | 'deployed'
+type Tab = 'table' | 'workload' | 'closed' | 'deployed' | 'delayplan'
 
-// Projects that belong in the Deployed tab (hidden from Planning & Tester Workload)
+// Deployed: Status is active AND testerFlag contains "Deployed"
 function isDeployed(p: PlanningProject): boolean {
-  return statusMatch(p.status, 'Implement : Wait for Deployment') ||
-    (p.testerFlag ?? []).some(f => f.toLowerCase() === 'deployed')
+  const hasDeployedFlag = (p.testerFlag ?? []).some(f => f.toLowerCase() === 'deployed')
+  return statusInList(p.status, ACTIVE_STATUSES) && hasDeployedFlag
+}
+
+// Delay Plan: GoLive date has passed AND
+//   (testerFlag <> "deployed") OR (Status is in active list)
+function isDelayPlan(p: PlanningProject, todayIso: string): boolean {
+  if (!p.goLiveDate || p.goLiveDate >= todayIso) return false
+  if (isDeployed(p)) return false  // already in Deployed tab
+  const hasDeployedFlag = (p.testerFlag ?? []).some(f => f.toLowerCase() === 'deployed')
+  const hasActiveStatus = statusInList(p.status, ACTIVE_STATUSES)
+  return !hasDeployedFlag || hasActiveStatus
 }
 
 // ── Status normalisation (trim spaces around colon for flexible matching) ──────
@@ -317,8 +327,9 @@ export default function PlanningView() {
   const [sort, setSort] = useState<PlanningSortState>(DEFAULT_SORT)
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('none')
   const [showImport, setShowImport] = useState(false)
-  const [closedSearch,   setClosedSearch]   = useState('')
-  const [deployedSearch, setDeployedSearch] = useState('')
+  const [closedSearch,    setClosedSearch]    = useState('')
+  const [deployedSearch,  setDeployedSearch]  = useState('')
+  const [delayPlanSearch, setDelayPlanSearch] = useState('')
 
   // ── Tester flags master list (initial = fallback so dropdown always has options) ──
   const [testerFlags, setTesterFlags] = useState<string[]>(FALLBACK_TESTER_FLAGS)
@@ -515,10 +526,22 @@ export default function PlanningView() {
     [projects, sort]
   )
 
-  // Deployed tab: Status = "Implement : Wait for Deployment" OR testerFlag includes "Deployed"
+  // todayIso for date comparisons
+  const todayIso = useMemo(
+    () => `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`,
+    [today]
+  )
+
+  // Deployed tab: Status in ACTIVE_STATUSES AND testerFlag = "Deployed"
   const deployedRows = useMemo(
     () => applySort(projects.filter(isDeployed), sort),
     [projects, sort]
+  )
+
+  // Delay Plan tab: GoLive < today AND (testerFlag <> "deployed" OR active status)
+  const delayPlanRows = useMemo(
+    () => applySort(projects.filter(p => isDelayPlan(p, todayIso)), sort),
+    [projects, sort, todayIso]
   )
 
   // Search filter helper for Closed / Deployed tabs (project name, tester, status)
@@ -532,8 +555,9 @@ export default function PlanningView() {
     )
   }
 
-  const filteredClosedRows   = useMemo(() => searchRows(closedRows,   closedSearch),   [closedRows,   closedSearch])
-  const filteredDeployedRows = useMemo(() => searchRows(deployedRows, deployedSearch), [deployedRows, deployedSearch])
+  const filteredClosedRows    = useMemo(() => searchRows(closedRows,    closedSearch),    [closedRows,    closedSearch])
+  const filteredDeployedRows  = useMemo(() => searchRows(deployedRows,  deployedSearch),  [deployedRows,  deployedSearch])
+  const filteredDelayPlanRows = useMemo(() => searchRows(delayPlanRows, delayPlanSearch), [delayPlanRows, delayPlanSearch])
 
   // ── Urgency summary — always from full base (not filtered) ───────────────────
 
@@ -741,10 +765,17 @@ export default function PlanningView() {
           icon={<Rocket size={14} />}
           label={`Deployed${deployedRows.length > 0 ? ` (${deployedRows.length})` : ''}`}
         />
+        <TabButton
+          active={tab === 'delayplan'}
+          onClick={() => setTab('delayplan')}
+          icon={<Clock size={14} />}
+          label={`Delay Plan${delayPlanRows.length > 0 ? ` (${delayPlanRows.length})` : ''}`}
+          color="red"
+        />
       </div>
 
-      {/* Filters — ซ่อนเมื่ออยู่ที่ Tab Closed หรือ Deployed */}
-      {tab !== 'closed' && tab !== 'deployed' && (
+      {/* Filters — ซ่อนเมื่ออยู่ที่ Tab Closed, Deployed หรือ Delay Plan */}
+      {tab !== 'closed' && tab !== 'deployed' && tab !== 'delayplan' && (
         <PlanningFilters
           projects={mainProjects}
           filters={filters}
@@ -856,6 +887,35 @@ export default function PlanningView() {
               />
             </>
           )}
+          {tab === 'delayplan' && (
+            <>
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs">
+                <Clock size={13} className="shrink-0" />
+                <span>แสดงรายการที่ GoLive date ผ่านมาแล้ว และยังไม่ได้ Deploy — GoLive &lt; {todayIso}</span>
+              </div>
+              <TabSearchBar
+                value={delayPlanSearch}
+                onChange={setDelayPlanSearch}
+                total={delayPlanRows.length}
+                filtered={filteredDelayPlanRows.length}
+              />
+              <PlanningTable
+                rows={filteredDelayPlanRows}
+                sort={sort}
+                onSort={handleSort}
+                onAssignTester={handleAssignTester}
+                onUpdateTestingPercent={handleUpdateTestingPercent}
+                onUpdateEstimateDay={handleUpdateEstimateDay}
+                onUpdateTesterFlag={handleUpdateTesterFlag}
+                onUpdateTesterNote={handleUpdateTesterNote}
+                testerFlags={testerFlags}
+                employees={employees}
+                pendingEditIds={pendingEditIds}
+                hiddenCols={hiddenCols}
+                today={today}
+              />
+            </>
+          )}
         </>
       )}
 
@@ -883,18 +943,23 @@ function TabButton({
   onClick,
   icon,
   label,
+  color = 'blue',
 }: {
   active: boolean
   onClick: () => void
   icon: React.ReactNode
   label: string
+  color?: 'blue' | 'red'
 }) {
+  const activeClass = color === 'red'
+    ? 'border-red-600 text-red-700 dark:text-red-300 bg-red-50/60 dark:bg-red-900/20'
+    : 'border-blue-600 text-blue-700 dark:text-blue-300 bg-blue-50/60 dark:bg-blue-900/20'
   return (
     <button
       onClick={onClick}
       className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
         active
-          ? 'border-blue-600 text-blue-700 dark:text-blue-300 bg-blue-50/60 dark:bg-blue-900/20'
+          ? activeClass
           : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-100/60 dark:hover:bg-slate-700'
       }`}
     >
