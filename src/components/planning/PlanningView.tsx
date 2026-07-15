@@ -84,14 +84,12 @@ function isDeployed(p: PlanningProject): boolean {
   return statusInList(p.status, ACTIVE_STATUSES) && hasDeployedFlag
 }
 
-// Delay Plan: GoLive date has passed AND
-//   (testerFlag <> "deployed") OR (Status is in active list)
+// Delay Plan: GoLive < today AND testerFlag <> "deployed" AND Status in ACTIVE_STATUSES
 function isDelayPlan(p: PlanningProject, todayIso: string): boolean {
   if (!p.goLiveDate || p.goLiveDate >= todayIso) return false
-  if (isDeployed(p)) return false  // already in Deployed tab
   const hasDeployedFlag = (p.testerFlag ?? []).some(f => f.toLowerCase() === 'deployed')
-  const hasActiveStatus = statusInList(p.status, ACTIVE_STATUSES)
-  return !hasDeployedFlag || hasActiveStatus
+  if (hasDeployedFlag) return false
+  return statusInList(p.status, ACTIVE_STATUSES)
 }
 
 // ── Status normalisation (trim spaces around colon for flexible matching) ──────
