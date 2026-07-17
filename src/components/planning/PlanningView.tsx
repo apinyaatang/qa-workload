@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Upload, Loader2, AlertCircle, X, LayoutList, Users, CalendarClock, UserX, ClipboardList,
-  Save, XCircle, Settings2, Eye, Rocket, Search, CalendarCheck, CheckCircle2, Clock,
+  RefreshCw, XCircle, Settings2, Eye, Rocket, Search, CalendarCheck, CheckCircle2, Clock,
 } from 'lucide-react'
 import type {
   PlanningProject,
@@ -342,9 +342,16 @@ export default function PlanningView() {
   const [showColMenu, setShowColMenu] = useState(false)
   const colMenuRef = useRef<HTMLDivElement>(null)
 
-  // ── Pending edits (staged, not yet saved to DB) ──────────────────────────────
-  const [pendingEdits, setPendingEdits] = useState<Map<string, Partial<PlanningProject>>>(new Map())
-  const [saving, setSaving] = useState(false)
+  // ── Autosave state: rows currently being saved, and conflict message ─────────
+  const [savingIds,   setSavingIds]   = useState<Set<string>>(new Set())
+  const [conflictMsg, setConflictMsg] = useState<string | null>(null)
+
+  // Ref for accessing latest projects inside async/setTimeout callbacks
+  const projectsRef = useRef<PlanningProject[]>([])
+  useEffect(() => { projectsRef.current = projects }, [projects])
+
+  // Debounce timers for testerNote (text field)
+  const noteTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   // ── Close column menu on outside click ──────────────────────────────────────
   useEffect(() => {
@@ -421,41 +428,7 @@ export default function PlanningView() {
     )
   }
 
-  // ── Stage an edit (optimistic UI update, queues for Save) ───────────────────
-
-  function stageEdit(id: string, patch: Partial<PlanningProject>) {
-    setProjects(prev => prev.map(p => (p.id === id ? { ...p, ...patch } : p)))
-    setPendingEdits(prev => {
-      const m = new Map(prev)
-      m.set(id, { ...(m.get(id) ?? {}), ...patch })
-      return m
-    })
-  }
-
-  function handleAssignTester(id: string, tester: string) {
-    stageEdit(id, { tester })
-  }
-
-  function handleUpdateTestingPercent(id: string, value: number | null) {
-    stageEdit(id, { testingPercent: value })
-  }
-
-  function handleUpdateEstimateDay(id: string, value: number | null) {
-    const project = projects.find(p => p.id === id)
-    if (!project) return
-    const newTestDate = calcTestDate(project.uatDate, project.goLiveDate, value, holidaySet)
-    stageEdit(id, { testEstimateDay: value, testDate: newTestDate })
-  }
-
-  function handleUpdateTesterFlag(id: string, values: string[]) {
-    stageEdit(id, { testerFlag: values })
-  }
-
-  function handleUpdateTesterNote(id: string, value: string) {
-    stageEdit(id, { testerNote: value })
-  }
-
-  // ── Save all pending edits to DB ─────────────────────────────────────────────
+  // ── DB column name map ───────────────────────────────────────────────────────
 
   const FIELD_TO_DB: Record<string, string> = {
     tester:          'tester',
@@ -466,29 +439,77 @@ export default function PlanningView() {
     testerNote:      'tester_note',
   }
 
-  async function handleSave() {
-    if (pendingEdits.size === 0) return
-    setSaving(true)
-    try {
-      for (const [id, patch] of pendingEdits) {
-        const dbFields: Record<string, unknown> = {}
-        for (const [k, v] of Object.entries(patch)) {
-          const col = FIELD_TO_DB[k]
-          if (col) {
-            // Serialize string[] to JSON string for tester_flag (TEXT column)
-            dbFields[col] = Array.isArray(v)
-              ? ((v as string[]).length > 0 ? JSON.stringify(v) : null)
-              : v
-          }
-        }
-        await planningDb.updateFields(id, dbFields)
-      }
-      setPendingEdits(new Map())
-    } catch {
-      await loadProjects()
-    } finally {
-      setSaving(false)
+  function buildDbPatch(patch: Partial<PlanningProject>): Record<string, unknown> {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(patch)) {
+      const col = FIELD_TO_DB[k]
+      if (!col) continue
+      out[col] = Array.isArray(v) ? ((v as string[]).length > 0 ? JSON.stringify(v) : null) : v
     }
+    return out
+  }
+
+  // ── Autosave: save one row immediately with optimistic lock ──────────────────
+
+  async function autoSave(id: string, dbPatch: Record<string, unknown>, knownUpdatedAt?: string) {
+    if (Object.keys(dbPatch).length === 0) return
+    setSavingIds(prev => new Set([...prev, id]))
+    try {
+      const result = await planningDb.updateFieldsChecked(id, dbPatch, knownUpdatedAt)
+      if (result.ok) {
+        // Refresh updatedAt so next save uses the new timestamp
+        setProjects(prev => prev.map(p => p.id === id ? { ...p, updatedAt: result.updatedAt } : p))
+        setConflictMsg(null)
+      } else if (result.reason === 'conflict') {
+        setConflictMsg('⚠️ ข้อมูลถูกแก้ไขโดยผู้ใช้อื่นขณะบันทึก — กรุณากด Refresh เพื่อโหลดข้อมูลล่าสุด')
+        await loadProjects()
+      } else {
+        setConflictMsg('บันทึกไม่สำเร็จ กรุณาลองใหม่')
+      }
+    } catch {
+      setConflictMsg('บันทึกไม่สำเร็จ กรุณาลองใหม่')
+    } finally {
+      setSavingIds(prev => { const s = new Set(prev); s.delete(id); return s })
+    }
+  }
+
+  // ── Edit handlers — autosave immediately on change ───────────────────────────
+
+  function handleAssignTester(id: string, tester: string) {
+    const p = projects.find(q => q.id === id)
+    setProjects(prev => prev.map(q => q.id === id ? { ...q, tester } : q))
+    autoSave(id, buildDbPatch({ tester }), p?.updatedAt)
+  }
+
+  function handleUpdateTestingPercent(id: string, value: number | null) {
+    const p = projects.find(q => q.id === id)
+    setProjects(prev => prev.map(q => q.id === id ? { ...q, testingPercent: value } : q))
+    autoSave(id, buildDbPatch({ testingPercent: value }), p?.updatedAt)
+  }
+
+  function handleUpdateEstimateDay(id: string, value: number | null) {
+    const p = projects.find(q => q.id === id)
+    if (!p) return
+    const newTestDate = calcTestDate(p.uatDate, p.goLiveDate, value, holidaySet)
+    const patch = { testEstimateDay: value, testDate: newTestDate }
+    setProjects(prev => prev.map(q => q.id === id ? { ...q, ...patch } : q))
+    autoSave(id, buildDbPatch(patch), p?.updatedAt)
+  }
+
+  function handleUpdateTesterFlag(id: string, values: string[]) {
+    const p = projects.find(q => q.id === id)
+    setProjects(prev => prev.map(q => q.id === id ? { ...q, testerFlag: values } : q))
+    autoSave(id, buildDbPatch({ testerFlag: values }), p?.updatedAt)
+  }
+
+  function handleUpdateTesterNote(id: string, value: string) {
+    // Optimistic update while typing, debounce the actual DB write
+    setProjects(prev => prev.map(q => q.id === id ? { ...q, testerNote: value } : q))
+    if (noteTimers.current.has(id)) clearTimeout(noteTimers.current.get(id)!)
+    noteTimers.current.set(id, setTimeout(() => {
+      const proj = projectsRef.current.find(q => q.id === id)
+      autoSave(id, buildDbPatch({ testerNote: value }), proj?.updatedAt)
+    }, 1000))
   }
 
   // ── Filtered & sorted rows ───────────────────────────────────────────────────
@@ -561,9 +582,9 @@ export default function PlanningView() {
 
   const urgency = useMemo(() => getUrgencyCounts(baseFiltered, today), [baseFiltered, today])
 
-  // ── Pending edit IDs (for row highlighting) ──────────────────────────────────
+  // ── Row IDs currently being saved (for row highlighting) ────────────────────
 
-  const pendingEditIds = useMemo(() => new Set(pendingEdits.keys()), [pendingEdits])
+  const pendingEditIds = savingIds
 
   // ── Import callbacks ─────────────────────────────────────────────────────────
 
@@ -648,25 +669,32 @@ export default function PlanningView() {
             Import CSV
           </button>
           <button
-            onClick={handleSave}
-            disabled={pendingEdits.size === 0 || saving}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-all ${
-              pendingEdits.size > 0
-                ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
-                : 'bg-gray-200 dark:bg-slate-700 text-gray-400 dark:text-slate-500 cursor-not-allowed'
-            }`}
-            title={pendingEdits.size > 0 ? `บันทึก ${pendingEdits.size} รายการที่แก้ไข` : 'ไม่มีการแก้ไข'}
+            onClick={loadProjects}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-200 text-sm font-semibold hover:bg-gray-300 dark:hover:bg-slate-600 shadow-sm transition-colors disabled:opacity-50"
+            title="Refresh ข้อมูลล่าสุด"
           >
-            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-            บันทึก
-            {pendingEdits.size > 0 && (
-              <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-white/30 text-xs font-bold">
-                {pendingEdits.size}
-              </span>
-            )}
+            {savingIds.size > 0
+              ? <Loader2 size={15} className="animate-spin text-blue-500" />
+              : <RefreshCw size={15} />}
+            Refresh
           </button>
         </div>
       </div>
+
+      {/* Conflict / save-error banner */}
+      {conflictMsg && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 text-sm">
+          <AlertCircle size={16} className="shrink-0" />
+          <span className="flex-1">{conflictMsg}</span>
+          <button
+            onClick={() => setConflictMsg(null)}
+            className="shrink-0 text-red-400 hover:text-red-600 dark:hover:text-red-200"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
 
       {/* Quick-filter chips — always visible when data loaded */}
       {!loading && !error && (

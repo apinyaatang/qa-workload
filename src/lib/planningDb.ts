@@ -157,6 +157,29 @@ export const planningDb = {
     throwIf(error, 'updateFields')
   },
 
+  // Optimistic-lock update: only applies if updated_at matches.
+  // Returns { ok: true, updatedAt } on success, or { ok: false, reason } on conflict/error.
+  async updateFieldsChecked(
+    id: string,
+    fields: Record<string, unknown>,
+    knownUpdatedAt?: string,
+  ): Promise<{ ok: true; updatedAt: string } | { ok: false; reason: 'conflict' | 'error' }> {
+    if (!isConfigured) return { ok: true, updatedAt: new Date().toISOString() }
+    try {
+      let q = (supabase as any)
+        .from('planning_projects')
+        .update(fields)
+        .eq('id', id)
+      if (knownUpdatedAt) q = q.eq('updated_at', knownUpdatedAt)
+      const { data, error } = await q.select('updated_at')
+      if (error) return { ok: false, reason: 'error' }
+      if (!data || data.length === 0) return { ok: false, reason: 'conflict' }
+      return { ok: true, updatedAt: data[0].updated_at as string }
+    } catch {
+      return { ok: false, reason: 'error' }
+    }
+  },
+
   async getTesterFlags(): Promise<string[]> {
     if (!isConfigured) return FALLBACK_TESTER_FLAGS
     try {
