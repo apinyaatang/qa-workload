@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowUp, ArrowDown, AlertTriangle, ChevronDown } from 'lucide-react'
 import type { PlanningProject, PlanningSortField, PlanningSortState } from '../../types/planning'
 import { getUrgencyFlags } from '../../types/planning'
@@ -339,13 +340,27 @@ function TesterFlagCell({
   onUpdateTesterFlag: (id: string, values: string[]) => void
 }) {
   const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 200 })
+  const triggerRef = useRef<HTMLDivElement>(null)
+  const menuRef    = useRef<HTMLDivElement>(null)
   const selected: string[] = Array.isArray(row.testerFlag) ? row.testerFlag : []
+
+  const openMenu = useCallback(() => {
+    if (!triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    setDropPos({
+      top:   rect.bottom + window.scrollY + 2,
+      left:  rect.left   + window.scrollX,
+      width: Math.max(rect.width, 200),
+    })
+    setOpen(true)
+  }, [])
 
   useEffect(() => {
     if (!open) return
     function handle(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      if (!triggerRef.current?.contains(t) && !menuRef.current?.contains(t)) setOpen(false)
     }
     document.addEventListener('mousedown', handle)
     return () => document.removeEventListener('mousedown', handle)
@@ -358,10 +373,44 @@ function TesterFlagCell({
     onUpdateTesterFlag(row.id, next)
   }
 
+  const menu = open ? createPortal(
+    <div
+      ref={menuRef}
+      style={{ position: 'fixed', top: dropPos.top, left: dropPos.left, minWidth: dropPos.width, zIndex: 9999 }}
+      className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg shadow-xl max-h-64 overflow-y-auto"
+    >
+      {masterFlags.map(flag => (
+        <label
+          key={flag}
+          className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer"
+        >
+          <input
+            type="checkbox"
+            checked={selected.includes(flag)}
+            onChange={() => toggle(flag)}
+            className="w-3 h-3 accent-indigo-600"
+          />
+          <span className="text-xs text-gray-700 dark:text-slate-200">{flag}</span>
+        </label>
+      ))}
+      {selected.length > 0 && (
+        <div className="border-t border-gray-100 dark:border-slate-700 px-3 py-1.5">
+          <button
+            onClick={() => { onUpdateTesterFlag(row.id, []); setOpen(false) }}
+            className="text-[11px] text-red-500 hover:underline"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+    </div>,
+    document.body,
+  ) : null
+
   return (
-    <div ref={ref} className="relative">
+    <div ref={triggerRef} className="relative">
       <div
-        onClick={() => setOpen(o => !o)}
+        onClick={() => open ? setOpen(false) : openMenu()}
         className="cursor-pointer flex items-start gap-1 rounded px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-slate-600 min-w-[120px]"
         title="Click to edit Tester Flag"
       >
@@ -378,35 +427,7 @@ function TesterFlagCell({
         </div>
         <ChevronDown size={11} className="text-gray-400 dark:text-slate-500 shrink-0 mt-0.5" />
       </div>
-
-      {open && (
-        <div className="absolute top-full left-0 mt-0.5 z-30 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg shadow-lg min-w-[200px] max-h-64 overflow-y-auto">
-          {masterFlags.map(flag => (
-            <label
-              key={flag}
-              className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer"
-            >
-              <input
-                type="checkbox"
-                checked={selected.includes(flag)}
-                onChange={() => toggle(flag)}
-                className="w-3 h-3 accent-indigo-600"
-              />
-              <span className="text-xs text-gray-700 dark:text-slate-200">{flag}</span>
-            </label>
-          ))}
-          {selected.length > 0 && (
-            <div className="border-t border-gray-100 dark:border-slate-700 px-3 py-1.5">
-              <button
-                onClick={() => { onUpdateTesterFlag(row.id, []); setOpen(false) }}
-                className="text-[11px] text-red-500 hover:underline"
-              >
-                Clear all
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      {menu}
     </div>
   )
 }
