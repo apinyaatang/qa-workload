@@ -576,12 +576,21 @@ export default function PlanningView() {
   const extraProjects = useMemo(() => extraTasks.map(extraTaskToProject), [extraTasks])
   const extraIds      = useMemo(() => new Set(extraTasks.map(t => t.id)), [extraTasks])
 
-  // Apply search/tester filter from planning filters to extra tasks (simple matching)
+  // Apply search/tester filter from planning filters to extra tasks
+  // Tester uses startsWith partial match: extra_tasks stores "Firstname Lastname",
+  // planning filter values may have "(Nickname)" suffix — match as long as one starts with the other.
   const filteredExtraProjects = useMemo(() => {
     return extraProjects.filter(p => {
       const s = filters.search?.trim().toLowerCase()
       if (s && !p.projectName.toLowerCase().includes(s) && !(p.tester ?? '').toLowerCase().includes(s)) return false
-      if (filters.testers?.length > 0 && !filters.testers.includes(p.tester)) return false
+      if (filters.testers?.length > 0) {
+        const et = (p.tester ?? '').toLowerCase().trim()
+        const matched = filters.testers.some(ft => {
+          const ft2 = ft.toLowerCase().trim()
+          return ft2 === et || ft2.startsWith(et + ' ') || ft2.startsWith(et + '(') || et.startsWith(ft2)
+        })
+        if (!matched) return false
+      }
       return true
     })
   }, [extraProjects, filters.search, filters.testers])
