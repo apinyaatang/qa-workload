@@ -7,16 +7,17 @@ function throwIf(error: unknown, ctx: string) {
 
 function fromRow(r: any): ExtraTask {
   return {
-    id:             r.id,
-    tester:         r.tester         ?? null,
-    projectName:    r.project_name   ?? '',
-    type:           r.type           ?? '',
-    status:         r.status         ?? '',
-    goLiveDate:     r.go_live_date   ?? null,
-    testingPercent: r.testing_percent ?? null,
-    remark:         r.remark         ?? null,
-    createdAt:      r.created_at,
-    updatedAt:      r.updated_at,
+    id:              r.id,
+    tester:          r.tester              ?? null,
+    projectName:     r.project_name        ?? '',
+    type:            r.type                ?? '',
+    status:          r.status              ?? '',
+    goLiveDate:      r.go_live_date        ?? null,
+    testingPercent:  r.testing_percent     ?? null,
+    testEstimateDay: r.test_estimate_day   ?? null,
+    remark:          r.remark              ?? null,
+    createdAt:       r.created_at,
+    updatedAt:       r.updated_at,
   }
 }
 
@@ -35,13 +36,14 @@ export const extraTaskDb = {
     const { data, error } = await (supabase as any)
       .from('extra_tasks')
       .insert({
-        tester:          task.tester         ?? null,
-        project_name:    task.projectName,
-        type:            task.type           ?? null,
-        status:          task.status         ?? null,
-        go_live_date:    task.goLiveDate     ?? null,
-        testing_percent: task.testingPercent ?? null,
-        remark:          task.remark         ?? null,
+        tester:            task.tester            ?? null,
+        project_name:      task.projectName,
+        type:              task.type              ?? null,
+        status:            task.status            ?? null,
+        go_live_date:      task.goLiveDate        ?? null,
+        testing_percent:   task.testingPercent    ?? null,
+        test_estimate_day: task.testEstimateDay   ?? null,
+        remark:            task.remark            ?? null,
       })
       .select()
       .single()

@@ -98,7 +98,7 @@ function extraTaskToProject(task: ExtraTask): PlanningProject {
     testingPercent: task.testingPercent,
     testerFlag:     [],
     testerNote:     task.remark || '',
-    testEstimateDay: null,
+    testEstimateDay: task.testEstimateDay,
     testDate:       null,
     remarkToPmos:   '',
     pm:             '',
