@@ -13,6 +13,8 @@ import type {
 } from '../../types/planning'
 import { getUrgencyFlags, PRIORITY_ORDER } from '../../types/planning'
 import { planningDb, FALLBACK_TESTER_FLAGS } from '../../lib/planningDb'
+import { extraTaskDb } from '../../lib/extraTaskDb'
+import type { ExtraTask } from '../../types/extraTask'
 
 import { PlanningFilters } from './PlanningFilters'
 import { PlanningTable, HIDEABLE_COLUMNS } from './PlanningTable'
@@ -77,6 +79,36 @@ const EMPTY_FILTERS: PlanningFiltersType = {
 const DEFAULT_SORT: PlanningSortState = { field: 'goLiveDate', dir: 'asc' }
 
 type Tab = 'table' | 'workload' | 'closed' | 'deployed' | 'delayplan'
+
+// ── Convert ExtraTask → PlanningProject for display in table/gantt ─────────────
+function extraTaskToProject(task: ExtraTask): PlanningProject {
+  return {
+    id:             task.id,
+    iteration:      '',
+    projectName:    task.projectName,
+    itemType:       task.type || '',
+    feature:        '',
+    tags:           '',
+    status:         task.status,
+    testLead:       '',
+    priority:       '',
+    tester:         task.tester || '',
+    goLiveDate:     task.goLiveDate,
+    uatDate:        null,
+    testingPercent: task.testingPercent,
+    testerFlag:     [],
+    testerNote:     task.remark || '',
+    testEstimateDay: null,
+    testDate:       null,
+    remarkToPmos:   '',
+    pm:             '',
+    baNote:         '',
+    quotationNo:    '',
+    epicNo:         '',
+    createdAt:      task.createdAt,
+    updatedAt:      task.updatedAt,
+  }
+}
 
 // Deployed: Status is active AND testerFlag contains "Deployed"
 function isDeployed(p: PlanningProject): boolean {
@@ -316,7 +348,8 @@ export default function PlanningView() {
   )
   const today = useMemo(() => new Date(), [])
 
-  const [projects, setProjects] = useState<PlanningProject[]>([])
+  const [projects,    setProjects]    = useState<PlanningProject[]>([])
+  const [extraTasks,  setExtraTasks]  = useState<ExtraTask[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -401,12 +434,14 @@ export default function PlanningView() {
     setLoading(true)
     setError(null)
     try {
-      const [data, flags] = await Promise.all([
+      const [data, flags, extra] = await Promise.all([
         planningDb.getAll(),
         planningDb.getTesterFlags(),
+        extraTaskDb.getAll(),
       ])
       setProjects(data)
       setTesterFlags(flags)
+      setExtraTasks(extra)
     } catch (err: any) {
       setError(err.message ?? 'Failed to load planning data.')
     } finally {
@@ -536,8 +571,26 @@ export default function PlanningView() {
     return applySort(quickFiltered, sort)
   }, [quickFiltered, quickFilter, sort])
 
+  // ── Extra tasks merged into Workload Table + Gantt ───────────────────────────
+
+  const extraProjects = useMemo(() => extraTasks.map(extraTaskToProject), [extraTasks])
+  const extraIds      = useMemo(() => new Set(extraTasks.map(t => t.id)), [extraTasks])
+
+  // Apply search/tester filter from planning filters to extra tasks (simple matching)
+  const filteredExtraProjects = useMemo(() => {
+    return extraProjects.filter(p => {
+      const s = filters.search?.trim().toLowerCase()
+      if (s && !p.projectName.toLowerCase().includes(s) && !(p.tester ?? '').toLowerCase().includes(s)) return false
+      if (filters.testers?.length > 0 && !filters.testers.includes(p.tester)) return false
+      return true
+    })
+  }, [extraProjects, filters.search, filters.testers])
+
+  // Workload Table rows = planning rows + extra tasks
+  const tableRows = useMemo(() => [...filteredRows, ...filteredExtraProjects], [filteredRows, filteredExtraProjects])
+
   // Gantt rows = same data (Gantt has its own internal group sort)
-  const ganttRows = filteredRows
+  const ganttRows = tableRows
 
   // Closed/cancelled rows — normalised match against CLOSED_STATUSES
   const closedRows = useMemo(
@@ -771,13 +824,13 @@ export default function PlanningView() {
           active={tab === 'table'}
           onClick={() => setTab('table')}
           icon={<LayoutList size={14} />}
-          label="Planning Table"
+          label="Workload Table"
         />
         <TabButton
           active={tab === 'workload'}
           onClick={() => setTab('workload')}
           icon={<Users size={14} />}
-          label="Tester Workload"
+          label="Workload Gantt View"
         />
         <TabButton
           active={tab === 'closed'}
@@ -840,7 +893,7 @@ export default function PlanningView() {
         <>
           {tab === 'table' && (
             <PlanningTable
-              rows={filteredRows}
+              rows={tableRows}
               sort={sort}
               onSort={handleSort}
               onAssignTester={handleAssignTester}
@@ -851,6 +904,7 @@ export default function PlanningView() {
               testerFlags={testerFlags}
               employees={employees}
               pendingEditIds={pendingEditIds}
+              extraIds={extraIds}
               hiddenCols={hiddenCols}
               today={today}
             />
@@ -860,6 +914,7 @@ export default function PlanningView() {
               projects={ganttRows}
               holidays={holidaySet}
               employees={employees}
+              extraIds={extraIds}
               today={today}
             />
           )}

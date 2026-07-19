@@ -97,6 +97,7 @@ interface Props {
   testerFlags: string[]
   employees: Employee[]
   pendingEditIds: Set<string>
+  extraIds?: Set<string>
   hiddenCols: Set<string>
   today: Date
 }
@@ -484,7 +485,7 @@ export function PlanningTable({
   rows, sort, onSort, onAssignTester,
   onUpdateTestingPercent, onUpdateEstimateDay,
   onUpdateTesterFlag, onUpdateTesterNote,
-  testerFlags, employees, pendingEditIds, hiddenCols, today,
+  testerFlags, employees, pendingEditIds, extraIds, hiddenCols, today,
 }: Props) {
   const vis = (key: string) => !hiddenCols.has(key)
   const visibleCount = COLUMNS_DEF.filter(c => vis(c.key)).length
@@ -532,7 +533,8 @@ export function PlanningTable({
             </tr>
           )}
           {rows.map((row, idx) => {
-            const flags = getUrgencyFlags(row, today)
+            const isExtra = extraIds?.has(row.id) ?? false
+            const flags = isExtra ? [] : getUrgencyFlags(row, today)
             const isCritical = flags.includes('critical-priority')
             const isUatNear = flags.includes('uat-near')
             const isGoLiveNear = flags.includes('golive-near')
@@ -541,13 +543,16 @@ export function PlanningTable({
             const isPending = pendingEditIds.has(row.id)
 
             let rowBg = ''
-            if (isMissingTester) rowBg = 'bg-red-100 dark:bg-red-900/25'
-            if (isUatNear)       rowBg = 'bg-amber-100 dark:bg-amber-900/25'
-            if (isGoLiveNear)    rowBg = 'bg-orange-100 dark:bg-orange-900/25'
+            if (isExtra)         rowBg = 'bg-violet-50 dark:bg-violet-900/15'
+            else if (isMissingTester) rowBg = 'bg-red-100 dark:bg-red-900/25'
+            else if (isUatNear)       rowBg = 'bg-amber-100 dark:bg-amber-900/25'
+            else if (isGoLiveNear)    rowBg = 'bg-orange-100 dark:bg-orange-900/25'
             if (isPending)       rowBg = 'bg-yellow-50 dark:bg-yellow-900/20'
 
             const leftBorder = isPending
               ? 'border-l-4 border-l-yellow-400'
+              : isExtra
+              ? 'border-l-4 border-l-violet-400'
               : isCritical
               ? 'border-l-4 border-l-red-600'
               : 'border-l-4 border-l-transparent'
@@ -563,9 +568,15 @@ export function PlanningTable({
                 )}
                 {vis('id') && (
                   <td className={`${tdBase} sticky left-0 z-10 font-mono text-xs text-blue-700 dark:text-blue-300 whitespace-nowrap shadow-[2px_0_4px_-1px_rgba(0,0,0,0.07)] ${rowBg || 'bg-white dark:bg-slate-800'}`}>
-                    {row.id}
-                    {isPending && (
-                      <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-yellow-400 align-middle" title="มีการแก้ไขที่ยังไม่บันทึก" />
+                    {isExtra ? (
+                      <span className="text-violet-500 dark:text-violet-400 italic text-[10px]">extra</span>
+                    ) : (
+                      <>
+                        {row.id}
+                        {isPending && (
+                          <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-yellow-400 align-middle" title="มีการแก้ไขที่ยังไม่บันทึก" />
+                        )}
+                      </>
                     )}
                   </td>
                 )}
@@ -573,8 +584,15 @@ export function PlanningTable({
                   <td className={`${tdBase} whitespace-nowrap`}>{row.iteration || '—'}</td>
                 )}
                 {vis('projectName') && (
-                  <td className={`${tdBase} max-w-[180px]`}>
-                    <span className="block truncate" title={row.projectName}>{row.projectName}</span>
+                  <td className={`${tdBase} max-w-[200px]`}>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {isExtra && (
+                        <span className="shrink-0 px-1 py-0.5 rounded text-[9px] font-bold uppercase bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-300 border border-violet-200 dark:border-violet-700">
+                          Extra
+                        </span>
+                      )}
+                      <span className="block truncate" title={row.projectName}>{row.projectName}</span>
+                    </div>
                   </td>
                 )}
                 {vis('itemType') && (
@@ -613,51 +631,78 @@ export function PlanningTable({
                 )}
                 {vis('tester') && (
                   <td className={tdBase}>
-                    <TesterCell
-                      row={row}
-                      onAssignTester={onAssignTester}
-                      hasMissingTester={isMissingTester}
-                      employees={employees}
-                    />
+                    {isExtra ? (
+                      <span className="text-gray-700 dark:text-slate-200 text-xs">{row.tester || '—'}</span>
+                    ) : (
+                      <TesterCell
+                        row={row}
+                        onAssignTester={onAssignTester}
+                        hasMissingTester={isMissingTester}
+                        employees={employees}
+                      />
+                    )}
                   </td>
                 )}
                 {vis('goLiveDate') && (
                   <td className={`${tdBase} whitespace-nowrap`}>
-                    <span className={goLiveNearHighlight ? 'font-semibold text-orange-600' : ''}>
+                    <span className={goLiveNearHighlight && !isExtra ? 'font-semibold text-orange-600' : ''}>
                       {formatDate(row.goLiveDate)}
                     </span>
                   </td>
                 )}
                 {vis('uatDate') && (
                   <td className={`${tdBase} whitespace-nowrap`}>
-                    <span className={uatNearHighlight ? 'font-semibold text-amber-600' : ''}>
+                    <span className={uatNearHighlight && !isExtra ? 'font-semibold text-amber-600' : ''}>
                       {formatDate(row.uatDate)}
                     </span>
                   </td>
                 )}
                 {vis('testingPercent') && (
                   <td className={`${tdBase} min-w-[90px]`}>
-                    <TestingPercentCell row={row} onUpdateTestingPercent={onUpdateTestingPercent} />
+                    {isExtra ? (
+                      row.testingPercent != null ? (
+                        <div className="flex items-center gap-1">
+                          <div className="w-12 h-1.5 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden">
+                            <div className={`h-full rounded-full ${row.testingPercent >= 100 ? 'bg-green-500' : row.testingPercent >= 50 ? 'bg-blue-400' : 'bg-orange-400'}`} style={{ width: `${Math.min(100, row.testingPercent)}%` }} />
+                          </div>
+                          <span className="text-[11px] font-semibold text-gray-600 dark:text-slate-300">{row.testingPercent}%</span>
+                        </div>
+                      ) : <span className="text-gray-400 text-xs">—</span>
+                    ) : (
+                      <TestingPercentCell row={row} onUpdateTestingPercent={onUpdateTestingPercent} />
+                    )}
                   </td>
                 )}
                 {vis('testerFlag') && (
                   <td className={`${tdBase}`}>
-                    <TesterFlagCell row={row} masterFlags={testerFlags} onUpdateTesterFlag={onUpdateTesterFlag} />
+                    {isExtra ? (
+                      <span className="text-gray-400 text-xs italic">—</span>
+                    ) : (
+                      <TesterFlagCell row={row} masterFlags={testerFlags} onUpdateTesterFlag={onUpdateTesterFlag} />
+                    )}
                   </td>
                 )}
                 {vis('testerNote') && (
                   <td className={`${tdBase}`}>
-                    <TesterNoteCell row={row} onUpdateTesterNote={onUpdateTesterNote} />
+                    {isExtra ? (
+                      <span className="text-xs text-gray-600 dark:text-slate-300 max-w-[200px] block truncate" title={row.testerNote}>{row.testerNote || '—'}</span>
+                    ) : (
+                      <TesterNoteCell row={row} onUpdateTesterNote={onUpdateTesterNote} />
+                    )}
                   </td>
                 )}
                 {vis('testEstimateDay') && (
                   <td className={`${tdBase} whitespace-nowrap text-center`}>
-                    <EstimateDayCell row={row} onUpdateEstimateDay={onUpdateEstimateDay} isMissingEstimate={isMissingEstimate} />
+                    {isExtra ? (
+                      <span className="text-gray-400 text-xs">—</span>
+                    ) : (
+                      <EstimateDayCell row={row} onUpdateEstimateDay={onUpdateEstimateDay} isMissingEstimate={isMissingEstimate} />
+                    )}
                   </td>
                 )}
                 {vis('testDate') && (
                   <td className={`${tdBase} whitespace-nowrap`}>
-                    <span className={`font-semibold ${testDatePast ? 'text-red-600' : 'text-gray-800 dark:text-slate-100'}`}>
+                    <span className={`font-semibold ${testDatePast && !isExtra ? 'text-red-600' : 'text-gray-800 dark:text-slate-100'}`}>
                       {formatDate(row.testDate)}
                     </span>
                   </td>

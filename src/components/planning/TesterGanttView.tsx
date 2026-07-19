@@ -66,6 +66,7 @@ interface Props {
   projects: PlanningProject[]
   holidays: Set<string>
   employees?: Employee[]
+  extraIds?: Set<string>
   today?: Date
 }
 
@@ -200,7 +201,7 @@ function buildDateRange(
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function TesterGanttView({ projects, holidays, employees = [], today = new Date() }: Props) {
+export default function TesterGanttView({ projects, holidays, employees = [], extraIds, today = new Date() }: Props) {
   const todayIso = today.toISOString().slice(0, 10)
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -305,19 +306,27 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
               </div>
 
               {/* Task rows */}
-              {group.rows.map(({ project: p }) => (
+              {group.rows.map(({ project: p }) => {
+                const isExtra = extraIds?.has(p.id) ?? false
+                return (
                 <div
                   key={p.id}
-                  className="flex items-center gap-2 px-3 border-b border-gray-50 dark:border-slate-700 hover:bg-blue-50/40 dark:hover:bg-slate-700/50 transition-colors"
+                  className={`flex items-center gap-2 px-3 border-b border-gray-50 dark:border-slate-700 hover:bg-blue-50/40 dark:hover:bg-slate-700/50 transition-colors ${isExtra ? 'bg-violet-50/40 dark:bg-violet-900/10' : ''}`}
                   style={{ height: ROW_H }}
                 >
-                  {/* Priority dot */}
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ background: priorityColor(p.priority) }}
-                  />
+                  {/* Priority dot / Extra badge */}
+                  {isExtra ? (
+                    <span className="shrink-0 px-1 py-0.5 rounded text-[8px] font-bold uppercase bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-300 border border-violet-200 dark:border-violet-700 leading-none">
+                      E
+                    </span>
+                  ) : (
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ background: priorityColor(p.priority) }}
+                    />
+                  )}
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-gray-800 dark:text-slate-100 truncate leading-tight">
+                    <p className={`text-xs font-medium truncate leading-tight ${isExtra ? 'text-violet-800 dark:text-violet-200' : 'text-gray-800 dark:text-slate-100'}`}>
                       {p.projectName}
                     </p>
                     {p.feature && (
@@ -346,7 +355,7 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
                     </div>
                   )}
                 </div>
-              ))}
+              )})}
             </div>
           ))}
         </div>
@@ -427,10 +436,12 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
                 </div>
 
                 {/* Task rows */}
-                {group.rows.map(({ project: p, bars }) => (
+                {group.rows.map(({ project: p, bars }) => {
+                  const isExtraRow = extraIds?.has(p.id) ?? false
+                  return (
                   <div
                     key={p.id}
-                    className="relative border-b border-gray-50 dark:border-slate-700 hover:bg-blue-50/20 dark:hover:bg-slate-700/50"
+                    className={`relative border-b border-gray-50 dark:border-slate-700 hover:bg-blue-50/20 dark:hover:bg-slate-700/50 ${isExtraRow ? 'bg-violet-50/30 dark:bg-violet-900/10' : ''}`}
                     style={{ height: ROW_H }}
                   >
                     {/* Column background stripes for weekdays */}
@@ -493,7 +504,7 @@ export default function TesterGanttView({ projects, holidays, employees = [], to
                       )
                     })}
                   </div>
-                ))}
+                )})}
               </div>
             ))}
           </div>
