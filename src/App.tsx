@@ -11,6 +11,7 @@ import IndividualReport from './components/individual/IndividualReport'
 import SettingsView from './components/settings/SettingsView'
 import ImportView from './components/import/ImportView'
 import PlanningView from './components/planning/PlanningView'
+import ExtraTaskView from './components/extratask/ExtraTaskView'
 import MyProjectsView from './components/myprojects/MyProjectsView'
 import ProjectProgressView from './components/progress/ProjectProgressView'
 import { Loader2 } from 'lucide-react'
@@ -29,6 +30,7 @@ function AppContent() {
       case 'settings':         return <SettingsView />
       case 'import':           return <ImportView />
       case 'planning':         return <PlanningView />
+      case 'extra-tasks':      return <ExtraTaskView />
       case 'my-projects':      return <MyProjectsView />
       case 'project-progress': return <ProjectProgressView projectId={selectedProjectId ?? ''} />
       default:                 return <TeamDashboard />

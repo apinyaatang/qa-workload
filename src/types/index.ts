@@ -120,6 +120,7 @@ export type ViewType =
   | 'individual' | 'settings' | 'import' | 'planning'
   | 'my-projects'
   | 'project-progress'
+  | 'extra-tasks'
 
 // ─── Master Project ───────────────────────────────────────────────────────────
 export type ProjectStatus = 'Active' | 'Inactive' | 'Completed'
