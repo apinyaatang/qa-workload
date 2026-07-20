@@ -204,7 +204,8 @@ function buildDateRange(
 export default function TesterGanttView({ projects, holidays, employees = [], extraIds, today = new Date() }: Props) {
   const todayIso = today.toISOString().slice(0, 10)
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const scrollRef    = useRef<HTMLDivElement>(null)
+  const leftPanelRef = useRef<HTMLDivElement>(null)
 
   const groups = useMemo(() => buildGroups(projects, holidays), [projects, holidays])
 
@@ -234,6 +235,13 @@ export default function TesterGanttView({ projects, holidays, employees = [], ex
     }
   }, [colIndex, todayIso])
 
+  // Sync vertical scroll: right panel → left panel
+  function handleRightScroll() {
+    if (leftPanelRef.current && scrollRef.current) {
+      leftPanelRef.current.scrollTop = scrollRef.current.scrollTop
+    }
+  }
+
   // Build month header spans
   const monthSpans = useMemo(() => {
     const spans: { label: string; count: number }[] = []
@@ -261,11 +269,12 @@ export default function TesterGanttView({ projects, holidays, employees = [], ex
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
       {/* Outer scroll wrapper */}
-      <div className="flex overflow-hidden" style={{ minHeight: 200 }}>
+      <div className="flex overflow-hidden" style={{ minHeight: 200, maxHeight: 'calc(100vh - 14rem)' }}>
         {/* ── Sticky left panel ── */}
         <div
+          ref={leftPanelRef}
           className="shrink-0 border-r border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 z-20"
-          style={{ width: LEFT_W }}
+          style={{ width: LEFT_W, overflowY: 'hidden' }}
         >
           {/* Header filler matching date headers */}
           <div
@@ -361,7 +370,7 @@ export default function TesterGanttView({ projects, holidays, employees = [], ex
         </div>
 
         {/* ── Scrollable timeline ── */}
-        <div ref={scrollRef} className="flex-1 overflow-x-auto overflow-y-auto">
+        <div ref={scrollRef} className="flex-1 overflow-x-auto overflow-y-auto" onScroll={handleRightScroll}>
           <div style={{ width: totalW, minWidth: totalW, position: 'relative' }}>
             {/* Month header */}
             <div className="flex border-b border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 sticky top-0 z-10" style={{ height: 28 }}>
