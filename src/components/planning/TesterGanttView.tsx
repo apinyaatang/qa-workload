@@ -373,7 +373,7 @@ export default function TesterGanttView({ projects, holidays, employees = [], ex
         <div ref={scrollRef} className="flex-1 overflow-x-auto overflow-y-auto" onScroll={handleRightScroll}>
           <div style={{ width: totalW, minWidth: totalW, position: 'relative' }}>
             {/* Month header */}
-            <div className="flex border-b border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 sticky top-0 z-10" style={{ height: 28 }}>
+            <div className="flex border-b border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 sticky top-0 z-30" style={{ height: 28 }}>
               {monthSpans.map((span, i) => (
                 <div
                   key={i}
@@ -386,7 +386,7 @@ export default function TesterGanttView({ projects, holidays, employees = [], ex
             </div>
 
             {/* Day header */}
-            <div className="flex border-b border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 sticky top-7 z-10" style={{ height: HEAD_H - 28 }}>
+            <div className="flex border-b border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 sticky top-7 z-30" style={{ height: HEAD_H - 28 }}>
               {workingDays.map(iso => {
                 const isToday = iso === todayIso
                 const dayNum  = iso.slice(8)
