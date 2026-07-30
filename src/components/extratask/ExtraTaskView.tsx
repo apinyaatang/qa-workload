@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Plus, Trash2, Loader2, AlertCircle, X, RefreshCw, ChevronDown, Save } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { extraTaskDb } from '../../lib/extraTaskDb'
+import { planningDb } from '../../lib/planningDb'
 import { ALL_STATUSES } from '../planning/PlanningView'
 import { EXTRA_TASK_TYPES } from '../../types/extraTask'
 import type { ExtraTask, ExtraTaskType } from '../../types/extraTask'
@@ -211,6 +212,77 @@ function InlineDropdown({ value, options, placeholder, employees, onSave, minWid
   )
 }
 
+// ── TesterFlag multi-select inline cell ───────────────────────────────────────
+
+function TesterFlagInline({ selected, masterFlags, onSave }: {
+  selected: string[]
+  masterFlags: string[]
+  onSave: (values: string[]) => void
+}) {
+  const [open, setOpen]     = useState(false)
+  const [pos, setPos]       = useState({ top: 0, left: 0, width: 200 })
+  const trigRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  const openMenu = useCallback(() => {
+    if (!trigRef.current) return
+    const r = trigRef.current.getBoundingClientRect()
+    setPos({ top: r.bottom + window.scrollY + 2, left: r.left + window.scrollX, width: Math.max(r.width, 200) })
+    setOpen(true)
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    function h(e: MouseEvent) {
+      const t = e.target as Node
+      if (!trigRef.current?.contains(t) && !menuRef.current?.contains(t)) setOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+
+  function toggle(flag: string) {
+    const next = selected.includes(flag) ? selected.filter(f => f !== flag) : [...selected, flag]
+    onSave(next)
+  }
+
+  return (
+    <div ref={trigRef} className="relative">
+      <div onClick={() => open ? setOpen(false) : openMenu()}
+        className="cursor-pointer flex items-start gap-1 rounded px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-slate-600 min-w-[120px]">
+        <div className="flex flex-wrap gap-0.5 flex-1 max-w-[180px]">
+          {selected.length === 0 ? (
+            <span className="text-gray-400 dark:text-slate-500 italic text-[11px]">—</span>
+          ) : (
+            selected.map(f => (
+              <span key={f} className="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded text-[10px] whitespace-nowrap">{f}</span>
+            ))
+          )}
+        </div>
+        <ChevronDown size={10} className="text-gray-400 shrink-0 mt-0.5" />
+      </div>
+      {open && createPortal(
+        <div ref={menuRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, minWidth: pos.width, zIndex: 9999 }}
+          className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg shadow-xl max-h-64 overflow-y-auto">
+          {masterFlags.map(flag => (
+            <label key={flag} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer">
+              <input type="checkbox" checked={selected.includes(flag)} onChange={() => toggle(flag)} className="w-3 h-3 accent-indigo-600" />
+              <span className="text-xs text-gray-700 dark:text-slate-200">{flag}</span>
+            </label>
+          ))}
+          {selected.length > 0 && (
+            <div className="border-t border-gray-100 dark:border-slate-700 px-3 py-1.5">
+              <button onMouseDown={() => { onSave([]); setOpen(false) }} className="text-[11px] text-red-500 hover:underline">Clear all</button>
+            </div>
+          )}
+        </div>,
+        document.body,
+      )}
+    </div>
+  )
+}
+
 // ── TestingBar ─────────────────────────────────────────────────────────────────
 
 function TestingBar({ pct }: { pct: number | null }) {
@@ -334,22 +406,27 @@ export default function ExtraTaskView() {
   const { employees } = useApp()
   const activeEmployees = employees.filter(e => e.isActive).map(e => ({ id: e.id, name: `${e.firstName} ${e.lastName}`.trim() }))
 
-  const [tasks,       setTasks]       = useState<ExtraTask[]>([])
-  const [loading,     setLoading]     = useState(true)
-  const [error,       setError]       = useState<string | null>(null)
-  const [conflictMsg, setConflictMsg] = useState<string | null>(null)
-  const [savingIds,   setSavingIds]   = useState<Set<string>>(new Set())
-  const [deleting,    setDeleting]    = useState<Set<string>>(new Set())
-  const [showAdd,     setShowAdd]     = useState(false)
-  const [search,      setSearch]      = useState('')
-  const [filterType,  setFilterType]  = useState('')
-  const [filterTester,setFilterTester]= useState('')
+  const [tasks,        setTasks]        = useState<ExtraTask[]>([])
+  const [testerFlags,  setTesterFlags]  = useState<string[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [error,        setError]        = useState<string | null>(null)
+  const [conflictMsg,  setConflictMsg]  = useState<string | null>(null)
+  const [savingIds,    setSavingIds]    = useState<Set<string>>(new Set())
+  const [deleting,     setDeleting]     = useState<Set<string>>(new Set())
+  const [showAdd,      setShowAdd]      = useState(false)
+  const [search,       setSearch]       = useState('')
+  const [filterType,   setFilterType]   = useState('')
+  const [filterTester, setFilterTester] = useState('')
   const tasksRef = useRef<ExtraTask[]>([])
   useEffect(() => { tasksRef.current = tasks }, [tasks])
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
-    try { setTasks(await extraTaskDb.getAll()) }
+    try {
+      const [data, flags] = await Promise.all([extraTaskDb.getAll(), planningDb.getTesterFlags()])
+      setTasks(data)
+      setTesterFlags(flags)
+    }
     catch (e: any) { setError(e.message ?? 'โหลดข้อมูลไม่สำเร็จ') }
     finally { setLoading(false) }
   }, [])
@@ -371,6 +448,7 @@ export default function ExtraTaskView() {
     if ('goLiveDate'      in patch) fields.go_live_date      = patch.goLiveDate      ?? null
     if ('testingPercent'  in patch) fields.testing_percent   = patch.testingPercent  ?? null
     if ('testEstimateDay' in patch) fields.test_estimate_day = patch.testEstimateDay ?? null
+    if ('testerFlag'      in patch) fields.tester_flag       = (patch.testerFlag ?? []).length ? patch.testerFlag : null
     if ('remark'          in patch) fields.remark            = patch.remark          ?? null
     try {
       const result = await extraTaskDb.updateFieldsChecked(id, fields, task.updatedAt)
@@ -403,6 +481,7 @@ export default function ExtraTaskView() {
       goLiveDate:      form.goLiveDate || null,
       testingPercent:  pct,
       testEstimateDay: est,
+      testerFlag:      [],
       remark:          form.remark || null,
     })
     setTasks(prev => [created, ...prev])
@@ -521,6 +600,7 @@ export default function ExtraTaskView() {
                 <th className={thCls} style={{ minWidth: 110 }}>Go Live</th>
                 <th className={thCls} style={{ minWidth: 80 }}>Est.(d)</th>
                 <th className={thCls} style={{ minWidth: 110 }}>Testing %</th>
+                <th className={thCls} style={{ minWidth: 160 }}>Tester Flag</th>
                 <th className={thCls} style={{ minWidth: 160 }}>Remark</th>
                 <th className={`${thCls} w-10`}></th>
               </tr>
@@ -616,6 +696,15 @@ export default function ExtraTaskView() {
                           onSave={v => autoSave(task.id, { testingPercent: v })}
                         />
                       </div>
+                    </td>
+
+                    {/* Tester Flag — multi-select portal */}
+                    <td className={tdCls}>
+                      <TesterFlagInline
+                        selected={task.testerFlag ?? []}
+                        masterFlags={testerFlags}
+                        onSave={v => autoSave(task.id, { testerFlag: v })}
+                      />
                     </td>
 
                     {/* Remark — inline text (multiline) */}

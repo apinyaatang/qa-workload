@@ -17,6 +17,7 @@ export interface ExtraTask {
   goLiveDate:      string | null
   testingPercent:  number | null
   testEstimateDay: number | null
+  testerFlag:      string[]
   remark:          string | null
   createdAt:       string
   updatedAt:       string

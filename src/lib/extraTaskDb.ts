@@ -6,6 +6,12 @@ function throwIf(error: unknown, ctx: string) {
 }
 
 function fromRow(r: any): ExtraTask {
+  const rawFlag = r.tester_flag
+  const testerFlag: string[] = Array.isArray(rawFlag)
+    ? rawFlag
+    : typeof rawFlag === 'string'
+    ? (() => { try { return JSON.parse(rawFlag) } catch { return [] } })()
+    : []
   return {
     id:              r.id,
     tester:          r.tester              ?? null,
@@ -15,6 +21,7 @@ function fromRow(r: any): ExtraTask {
     goLiveDate:      r.go_live_date        ?? null,
     testingPercent:  r.testing_percent     ?? null,
     testEstimateDay: r.test_estimate_day   ?? null,
+    testerFlag,
     remark:          r.remark              ?? null,
     createdAt:       r.created_at,
     updatedAt:       r.updated_at,
@@ -43,6 +50,7 @@ export const extraTaskDb = {
         go_live_date:      task.goLiveDate        ?? null,
         testing_percent:   task.testingPercent    ?? null,
         test_estimate_day: task.testEstimateDay   ?? null,
+        tester_flag:       task.testerFlag?.length ? task.testerFlag : null,
         remark:            task.remark            ?? null,
       })
       .select()

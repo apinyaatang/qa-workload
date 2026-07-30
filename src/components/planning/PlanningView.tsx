@@ -96,7 +96,7 @@ function extraTaskToProject(task: ExtraTask): PlanningProject {
     goLiveDate:     task.goLiveDate,
     uatDate:        null,
     testingPercent: task.testingPercent,
-    testerFlag:     [],
+    testerFlag:     task.testerFlag ?? [],
     testerNote:     task.remark || '',
     testEstimateDay: task.testEstimateDay,
     testDate:       null,
@@ -575,10 +575,22 @@ export default function PlanningView() {
   }
 
   function handleUpdateTesterFlag(id: string, values: string[]) {
-    if (extraIds.has(id)) return  // extra_tasks ไม่มี tester_flag column
+    if (extraIds.has(id)) {
+      const t = extraTasksRef.current.find(q => q.id === id)
+      setExtraTasks(prev => prev.map(q => q.id === id ? { ...q, testerFlag: values } : q))
+      autoSaveExtra(id, { tester_flag: values.length ? values : null }, t?.updatedAt)
+      return
+    }
     const p = projects.find(q => q.id === id)
     setProjects(prev => prev.map(q => q.id === id ? { ...q, testerFlag: values } : q))
     autoSave(id, buildDbPatch({ testerFlag: values }), p?.updatedAt)
+  }
+
+  function handleUpdateStatus(id: string, status: string) {
+    if (!extraIds.has(id)) return  // planning status ไม่แก้ในหน้านี้
+    const t = extraTasksRef.current.find(q => q.id === id)
+    setExtraTasks(prev => prev.map(q => q.id === id ? { ...q, status } : q))
+    autoSaveExtra(id, { status }, t?.updatedAt)
   }
 
   function handleUpdateTesterNote(id: string, value: string) {
@@ -964,7 +976,9 @@ export default function PlanningView() {
               onUpdateEstimateDay={handleUpdateEstimateDay}
               onUpdateTesterFlag={handleUpdateTesterFlag}
               onUpdateTesterNote={handleUpdateTesterNote}
+              onUpdateStatus={handleUpdateStatus}
               testerFlags={testerFlags}
+              statuses={ALL_STATUSES}
               employees={employees}
               pendingEditIds={pendingEditIds}
               extraIds={extraIds}

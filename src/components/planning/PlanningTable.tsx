@@ -94,7 +94,9 @@ interface Props {
   onUpdateEstimateDay: (id: string, value: number | null) => void
   onUpdateTesterFlag: (id: string, values: string[]) => void
   onUpdateTesterNote: (id: string, value: string) => void
+  onUpdateStatus?: (id: string, status: string) => void
   testerFlags: string[]
+  statuses?: readonly string[]
   employees: Employee[]
   pendingEditIds: Set<string>
   extraIds?: Set<string>
@@ -331,6 +333,79 @@ function EstimateDayCell({
   )
 }
 
+// ── Status dropdown cell (for extra rows) ─────────────────────────────────────
+
+function StatusCell({
+  row, statuses, onUpdateStatus,
+}: {
+  row: PlanningProject
+  statuses: readonly string[]
+  onUpdateStatus: (id: string, status: string) => void
+}) {
+  const [open, setOpen]     = useState(false)
+  const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 260 })
+  const triggerRef = useRef<HTMLDivElement>(null)
+  const menuRef    = useRef<HTMLDivElement>(null)
+
+  const openMenu = useCallback(() => {
+    if (!triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    setDropPos({
+      top:   rect.bottom + window.scrollY + 2,
+      left:  rect.left   + window.scrollX,
+      width: Math.max(rect.width, 260),
+    })
+    setOpen(true)
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    function handle(e: MouseEvent) {
+      const t = e.target as Node
+      if (!triggerRef.current?.contains(t) && !menuRef.current?.contains(t)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [open])
+
+  const menu = open ? createPortal(
+    <div
+      ref={menuRef}
+      style={{ position: 'fixed', top: dropPos.top, left: dropPos.left, minWidth: dropPos.width, zIndex: 9999 }}
+      className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg shadow-xl max-h-72 overflow-y-auto"
+    >
+      {statuses.map(s => (
+        <div
+          key={s}
+          onMouseDown={() => { onUpdateStatus(row.id, s); setOpen(false) }}
+          className={`px-3 py-1.5 text-xs cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 ${
+            s === row.status
+              ? 'font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-900/20'
+              : 'text-gray-700 dark:text-slate-200'
+          }`}
+        >
+          {s}
+        </div>
+      ))}
+    </div>,
+    document.body,
+  ) : null
+
+  return (
+    <div ref={triggerRef} className="relative">
+      <div
+        onClick={() => open ? setOpen(false) : openMenu()}
+        className="cursor-pointer flex items-center gap-1 rounded px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-slate-600 whitespace-nowrap"
+        title="Click to change status"
+      >
+        <span className="text-xs text-gray-700 dark:text-slate-200 truncate max-w-[200px]">{row.status || '—'}</span>
+        <ChevronDown size={10} className="text-gray-400 shrink-0" />
+      </div>
+      {menu}
+    </div>
+  )
+}
+
 // ── Tester Flag multi-select cell ──────────────────────────────────────────────
 
 function TesterFlagCell({
@@ -484,8 +559,8 @@ function TesterNoteCell({
 export function PlanningTable({
   rows, sort, onSort, onAssignTester,
   onUpdateTestingPercent, onUpdateEstimateDay,
-  onUpdateTesterFlag, onUpdateTesterNote,
-  testerFlags, employees, pendingEditIds, extraIds, hiddenCols, today,
+  onUpdateTesterFlag, onUpdateTesterNote, onUpdateStatus,
+  testerFlags, statuses = [], employees, pendingEditIds, extraIds, hiddenCols, today,
 }: Props) {
   const vis = (key: string) => !hiddenCols.has(key)
   const visibleCount = COLUMNS_DEF.filter(c => vis(c.key)).length
@@ -613,8 +688,12 @@ export function PlanningTable({
                   </td>
                 )}
                 {vis('status') && (
-                  <td className={`${tdBase} whitespace-nowrap`}>
-                    <span className="text-xs">{row.status || '—'}</span>
+                  <td className={`${tdBase}`}>
+                    {isExtra && onUpdateStatus && statuses.length > 0 ? (
+                      <StatusCell row={row} statuses={statuses} onUpdateStatus={onUpdateStatus} />
+                    ) : (
+                      <span className="text-xs whitespace-nowrap">{row.status || '—'}</span>
+                    )}
                   </td>
                 )}
                 {vis('testLead') && (
@@ -660,11 +739,7 @@ export function PlanningTable({
                 )}
                 {vis('testerFlag') && (
                   <td className={`${tdBase}`}>
-                    {isExtra ? (
-                      <span className="text-gray-400 text-xs italic">—</span>
-                    ) : (
-                      <TesterFlagCell row={row} masterFlags={testerFlags} onUpdateTesterFlag={onUpdateTesterFlag} />
-                    )}
+                    <TesterFlagCell row={row} masterFlags={testerFlags} onUpdateTesterFlag={onUpdateTesterFlag} />
                   </td>
                 )}
                 {vis('testerNote') && (
