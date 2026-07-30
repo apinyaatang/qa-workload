@@ -631,16 +631,12 @@ export function PlanningTable({
                 )}
                 {vis('tester') && (
                   <td className={tdBase}>
-                    {isExtra ? (
-                      <span className="text-gray-700 dark:text-slate-200 text-xs">{row.tester || '—'}</span>
-                    ) : (
-                      <TesterCell
-                        row={row}
-                        onAssignTester={onAssignTester}
-                        hasMissingTester={isMissingTester}
-                        employees={employees}
-                      />
-                    )}
+                    <TesterCell
+                      row={row}
+                      onAssignTester={onAssignTester}
+                      hasMissingTester={isMissingTester && !isExtra}
+                      employees={employees}
+                    />
                   </td>
                 )}
                 {vis('goLiveDate') && (
@@ -659,18 +655,7 @@ export function PlanningTable({
                 )}
                 {vis('testingPercent') && (
                   <td className={`${tdBase} min-w-[90px]`}>
-                    {isExtra ? (
-                      row.testingPercent != null ? (
-                        <div className="flex items-center gap-1">
-                          <div className="w-12 h-1.5 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden">
-                            <div className={`h-full rounded-full ${row.testingPercent >= 100 ? 'bg-green-500' : row.testingPercent >= 50 ? 'bg-blue-400' : 'bg-orange-400'}`} style={{ width: `${Math.min(100, row.testingPercent)}%` }} />
-                          </div>
-                          <span className="text-[11px] font-semibold text-gray-600 dark:text-slate-300">{row.testingPercent}%</span>
-                        </div>
-                      ) : <span className="text-gray-400 text-xs">—</span>
-                    ) : (
-                      <TestingPercentCell row={row} onUpdateTestingPercent={onUpdateTestingPercent} />
-                    )}
+                    <TestingPercentCell row={row} onUpdateTestingPercent={onUpdateTestingPercent} />
                   </td>
                 )}
                 {vis('testerFlag') && (
@@ -684,20 +669,12 @@ export function PlanningTable({
                 )}
                 {vis('testerNote') && (
                   <td className={`${tdBase}`}>
-                    {isExtra ? (
-                      <span className="text-xs text-gray-600 dark:text-slate-300 max-w-[200px] block truncate" title={row.testerNote}>{row.testerNote || '—'}</span>
-                    ) : (
-                      <TesterNoteCell row={row} onUpdateTesterNote={onUpdateTesterNote} />
-                    )}
+                    <TesterNoteCell row={row} onUpdateTesterNote={onUpdateTesterNote} />
                   </td>
                 )}
                 {vis('testEstimateDay') && (
                   <td className={`${tdBase} whitespace-nowrap text-center`}>
-                    {isExtra ? (
-                      <span className="text-gray-400 text-xs">—</span>
-                    ) : (
-                      <EstimateDayCell row={row} onUpdateEstimateDay={onUpdateEstimateDay} isMissingEstimate={isMissingEstimate} />
-                    )}
+                    <EstimateDayCell row={row} onUpdateEstimateDay={onUpdateEstimateDay} isMissingEstimate={isMissingEstimate && !isExtra} />
                   </td>
                 )}
                 {vis('testDate') && (

@@ -380,8 +380,10 @@ export default function PlanningView() {
   const [conflictMsg, setConflictMsg] = useState<string | null>(null)
 
   // Ref for accessing latest projects inside async/setTimeout callbacks
-  const projectsRef = useRef<PlanningProject[]>([])
-  useEffect(() => { projectsRef.current = projects }, [projects])
+  const projectsRef   = useRef<PlanningProject[]>([])
+  const extraTasksRef = useRef<ExtraTask[]>([])
+  useEffect(() => { projectsRef.current   = projects    }, [projects])
+  useEffect(() => { extraTasksRef.current = extraTasks  }, [extraTasks])
 
   // Debounce timers for testerNote (text field)
   const noteTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
@@ -508,21 +510,62 @@ export default function PlanningView() {
     }
   }
 
+  // ── Autosave for extra_tasks table ──────────────────────────────────────────
+
+  async function autoSaveExtra(id: string, fields: Record<string, unknown>, knownUpdatedAt?: string) {
+    if (Object.keys(fields).length === 0) return
+    setSavingIds(prev => new Set([...prev, id]))
+    try {
+      const result = await extraTaskDb.updateFieldsChecked(id, fields, knownUpdatedAt)
+      if (result.ok) {
+        setExtraTasks(prev => prev.map(t => t.id === id ? { ...t, updatedAt: result.updatedAt } : t))
+        setConflictMsg(null)
+      } else if (result.reason === 'conflict') {
+        setConflictMsg('⚠️ ข้อมูลถูกแก้ไขโดยผู้ใช้อื่นขณะบันทึก — กรุณากด Refresh เพื่อโหลดข้อมูลล่าสุด')
+        await loadProjects()
+      } else {
+        setConflictMsg('บันทึกไม่สำเร็จ กรุณาลองใหม่')
+      }
+    } catch {
+      setConflictMsg('บันทึกไม่สำเร็จ กรุณาลองใหม่')
+    } finally {
+      setSavingIds(prev => { const s = new Set(prev); s.delete(id); return s })
+    }
+  }
+
   // ── Edit handlers — autosave immediately on change ───────────────────────────
 
   function handleAssignTester(id: string, tester: string) {
+    if (extraIds.has(id)) {
+      const t = extraTasksRef.current.find(q => q.id === id)
+      setExtraTasks(prev => prev.map(q => q.id === id ? { ...q, tester: tester || null } : q))
+      autoSaveExtra(id, { tester: tester || null }, t?.updatedAt)
+      return
+    }
     const p = projects.find(q => q.id === id)
     setProjects(prev => prev.map(q => q.id === id ? { ...q, tester } : q))
     autoSave(id, buildDbPatch({ tester }), p?.updatedAt)
   }
 
   function handleUpdateTestingPercent(id: string, value: number | null) {
+    if (extraIds.has(id)) {
+      const t = extraTasksRef.current.find(q => q.id === id)
+      setExtraTasks(prev => prev.map(q => q.id === id ? { ...q, testingPercent: value } : q))
+      autoSaveExtra(id, { testing_percent: value }, t?.updatedAt)
+      return
+    }
     const p = projects.find(q => q.id === id)
     setProjects(prev => prev.map(q => q.id === id ? { ...q, testingPercent: value } : q))
     autoSave(id, buildDbPatch({ testingPercent: value }), p?.updatedAt)
   }
 
   function handleUpdateEstimateDay(id: string, value: number | null) {
+    if (extraIds.has(id)) {
+      const t = extraTasksRef.current.find(q => q.id === id)
+      setExtraTasks(prev => prev.map(q => q.id === id ? { ...q, testEstimateDay: value } : q))
+      autoSaveExtra(id, { test_estimate_day: value }, t?.updatedAt)
+      return
+    }
     const p = projects.find(q => q.id === id)
     if (!p) return
     const newTestDate = calcTestDate(p.uatDate, p.goLiveDate, value, holidaySet)
@@ -532,12 +575,23 @@ export default function PlanningView() {
   }
 
   function handleUpdateTesterFlag(id: string, values: string[]) {
+    if (extraIds.has(id)) return  // extra_tasks ไม่มี tester_flag column
     const p = projects.find(q => q.id === id)
     setProjects(prev => prev.map(q => q.id === id ? { ...q, testerFlag: values } : q))
     autoSave(id, buildDbPatch({ testerFlag: values }), p?.updatedAt)
   }
 
   function handleUpdateTesterNote(id: string, value: string) {
+    if (extraIds.has(id)) {
+      // testerNote → remark column in extra_tasks
+      setExtraTasks(prev => prev.map(q => q.id === id ? { ...q, remark: value || null } : q))
+      if (noteTimers.current.has(id)) clearTimeout(noteTimers.current.get(id)!)
+      noteTimers.current.set(id, setTimeout(() => {
+        const task = extraTasksRef.current.find(q => q.id === id)
+        autoSaveExtra(id, { remark: value || null }, task?.updatedAt)
+      }, 1000))
+      return
+    }
     // Optimistic update while typing, debounce the actual DB write
     setProjects(prev => prev.map(q => q.id === id ? { ...q, testerNote: value } : q))
     if (noteTimers.current.has(id)) clearTimeout(noteTimers.current.get(id)!)
