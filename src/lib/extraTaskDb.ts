@@ -40,19 +40,21 @@ export const extraTaskDb = {
   },
 
   async insert(task: Omit<ExtraTask, 'id' | 'createdAt' | 'updatedAt'>): Promise<ExtraTask> {
+    const payload: Record<string, unknown> = {
+      tester:            task.tester            ?? null,
+      project_name:      task.projectName,
+      type:              task.type              ?? null,
+      status:            task.status            ?? null,
+      go_live_date:      task.goLiveDate        ?? null,
+      testing_percent:   task.testingPercent    ?? null,
+      test_estimate_day: task.testEstimateDay   ?? null,
+      remark:            task.remark            ?? null,
+    }
+    // include tester_flag only when it has values (column may not exist until SQL is run)
+    if (task.testerFlag?.length) payload.tester_flag = task.testerFlag
     const { data, error } = await (supabase as any)
       .from('extra_tasks')
-      .insert({
-        tester:            task.tester            ?? null,
-        project_name:      task.projectName,
-        type:              task.type              ?? null,
-        status:            task.status            ?? null,
-        go_live_date:      task.goLiveDate        ?? null,
-        testing_percent:   task.testingPercent    ?? null,
-        test_estimate_day: task.testEstimateDay   ?? null,
-        tester_flag:       task.testerFlag?.length ? task.testerFlag : null,
-        remark:            task.remark            ?? null,
-      })
+      .insert(payload)
       .select()
       .single()
     throwIf(error, 'insert')
