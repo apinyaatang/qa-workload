@@ -121,6 +121,7 @@ export type ViewType =
   | 'my-projects'
   | 'project-progress'
   | 'extra-tasks'
+  | 'epics'
 
 // ─── Master Project ───────────────────────────────────────────────────────────
 export type ProjectStatus = 'Active' | 'Inactive' | 'Completed'
