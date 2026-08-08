@@ -2,12 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   RefreshCw, Loader2, AlertCircle, X, CloudDownload, ChevronDown,
-  AlertTriangle, ArrowUp, ArrowDown, Settings2,
+  AlertTriangle, ArrowUp, ArrowDown,
 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { epicDb, syncEpicsFromAdo } from '../../lib/epicDb'
 import { calcTestDate } from '../../utils/planningCsvParser'
-import { ALL_STATUSES } from '../planning/PlanningView'
 import TesterGanttView from '../planning/TesterGanttView'
 import type { Epic, AzureDevOpsConfig } from '../../types/epic'
 import type { PlanningProject } from '../../types/planning'
@@ -491,8 +490,8 @@ function EpicTable({ rows, savingIds, employees, testerFlags, sort, onSort, onSa
 type Tab = 'table' | 'gantt' | 'deployed' | 'delayplan'
 
 export default function EpicView() {
-  const { employees, holidays } = useApp()
-  const holidaySet = useMemo(() => new Set<string>(holidays.map((h: any) => h.date ?? h)), [holidays])
+  const { employees, publicHolidays } = useApp()
+  const holidaySet = useMemo(() => new Set<string>(publicHolidays.map((h: any) => h.date ?? h)), [publicHolidays])
   const activeEmployees = useMemo(() =>
     employees.filter((e: Employee) => e.isActive !== false).map((e: Employee) => ({ id: e.id, name: `${e.firstName} ${e.lastName}`.trim() }))
   , [employees])
