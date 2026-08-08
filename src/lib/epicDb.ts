@@ -83,6 +83,7 @@ const ADO_FIELDS = [
   'Microsoft.VSTS.Scheduling.TargetDate',
   'Custom.SITDate',
   'Custom.UATDate',
+  'Custom.TypeofEpic',
 ].join(',')
 
 export interface SyncResult {
@@ -168,7 +169,7 @@ export async function syncEpicsFromAdo(
 
     const adoFields = {
       epic_no:   epicNo,
-      item_type: f['System.WorkItemType'] ?? '',
+      item_type: f['Custom.TypeofEpic'] ?? f['System.WorkItemType'] ?? '',
       iteration: f['System.IterationPath'] ?? '',
       project:   f['System.AreaPath']     ?? '',
       feature:   f['System.Title']        ?? '',
