@@ -604,7 +604,15 @@ export default function EpicView() {
     setSyncing(true); setShowSync(false); setSyncMsg(null)
     try {
       const result = await syncEpicsFromAdo(cfg, holidaySet)
-      setSyncMsg(`Sync เสร็จ: เพิ่ม ${result.inserted} แถว, อัปเดต ${result.updated} แถว${result.errors.length ? `, error ${result.errors.length}` : ''}`)
+      const debugPaths = result.samplePaths.length
+        ? ` | ตัวอย่าง IterationPath: ${result.samplePaths.slice(0, 3).join(' / ')}`
+        : ''
+      const filterNote = result.totalFromAdo > 0 && result.total === 0
+        ? ` ⚠️ พบ ${result.totalFromAdo} Epics แต่ถูก filter ออกทั้งหมด (IterationPath ≤ 230)${debugPaths}`
+        : result.totalFromAdo === 0
+        ? ' ⚠️ ไม่พบ Epic ใน Azure DevOps (ตรวจ Project Name และ PAT)'
+        : ` (พบทั้งหมด ${result.totalFromAdo}, ผ่าน filter ${result.total})`
+      setSyncMsg(`Sync เสร็จ: เพิ่ม ${result.inserted} แถว, อัปเดต ${result.updated} แถว${filterNote}${result.errors.length ? ` | error ${result.errors.length}: ${result.errors[0]}` : ''}`)
       await load()
     } catch (e: any) {
       setSyncMsg(`Sync ล้มเหลว: ${e.message}`)

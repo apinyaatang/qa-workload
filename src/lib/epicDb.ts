@@ -86,11 +86,13 @@ const ADO_FIELDS = [
 ].join(',')
 
 export interface SyncResult {
-  inserted: number
-  updated:  number
-  skipped:  number
-  total:    number
-  errors:   string[]
+  inserted:       number
+  updated:        number
+  skipped:        number
+  total:          number
+  totalFromAdo:   number   // all epics before iteration filter
+  errors:         string[]
+  samplePaths:    string[] // first 3 IterationPath values (for debugging)
 }
 
 export async function syncEpicsFromAdo(
@@ -102,7 +104,7 @@ export async function syncEpicsFromAdo(
   const authHeader = `Basic ${base64Pat}`
   const apiBase    = `${orgUrl.replace(/\/$/, '')}/${encodeURIComponent(project)}/_apis`
 
-  const result: SyncResult = { inserted: 0, updated: 0, skipped: 0, total: 0, errors: [] }
+  const result: SyncResult = { inserted: 0, updated: 0, skipped: 0, total: 0, totalFromAdo: 0, errors: [], samplePaths: [] }
 
   // ── Step 1: WIQL — get all Epic IDs ─────────────────────────────────────────
   const wiqlRes = await fetch(`${apiBase}/wit/wiql?api-version=7.0`, {
@@ -114,7 +116,8 @@ export async function syncEpicsFromAdo(
   })
   if (!wiqlRes.ok) throw new Error(`WIQL failed: ${wiqlRes.status} ${await wiqlRes.text()}`)
   const wiqlData = await wiqlRes.json()
-  const allIds: number[] = (wiqlData.workItems ?? []).map((w: any) => w.id)
+  const allIds: number[] = (wiqlData.workItems ?? wiqlData.workItemRelations ?? []).map((w: any) => w.id ?? w.target?.id).filter(Boolean)
+  result.totalFromAdo = allIds.length
   if (allIds.length === 0) return result
 
   // ── Step 2: Batch fetch details (max 200 per request) ────────────────────────
@@ -135,6 +138,7 @@ export async function syncEpicsFromAdo(
   }
 
   // ── Step 3: Filter IterationPath trailing number > 230 ───────────────────────
+  result.samplePaths = allItems.slice(0, 5).map(item => item.fields?.['System.IterationPath'] ?? '(no path)')
   const filtered = allItems.filter(item => {
     const path = item.fields?.['System.IterationPath'] ?? ''
     return getIterationNumber(path) > 230
