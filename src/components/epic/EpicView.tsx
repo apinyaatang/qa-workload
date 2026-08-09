@@ -795,7 +795,7 @@ export default function EpicView() {
   const delayEpics    = useMemo(() => mainEpics.filter(e => isDelayPlan(e, todayIso)), [mainEpics, todayIso])
 
   const tableRows  = useMemo(() => applySort(applyFilters(mainEpics)), [mainEpics, search, filterOwner, filterState, filterIter, sort])
-  const ganttRows  = useMemo(() => tableRows.map(epicToProject), [tableRows])
+  const ganttRows  = useMemo(() => mainEpics.map(epicToProject), [mainEpics])
   const deployRows = useMemo(() => applySort(deployedEpics), [deployedEpics, sort])
   const delayRows  = useMemo(() => applySort(delayEpics), [delayEpics, sort])
 
