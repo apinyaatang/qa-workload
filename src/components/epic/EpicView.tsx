@@ -137,8 +137,10 @@ function MultiSelect({ value, options, placeholder, onChange, minWidth = 160 }: 
     onChange(value.includes(opt) ? value.filter(v => v !== opt) : [...value, opt])
   }
 
+  const displayOpt = (opt: string) => opt === '' ? '(ว่าง)' : opt
+
   const label = value.length === 0 ? placeholder
-    : value.length === 1 ? value[0]
+    : value.length === 1 ? displayOpt(value[0])
     : `${placeholder} (${value.length})`
 
   return (
@@ -163,10 +165,12 @@ function MultiSelect({ value, options, placeholder, onChange, minWidth = 160 }: 
             <div className="px-3 py-2 text-xs text-gray-400 italic">ไม่มีตัวเลือก</div>
           )}
           {options.map(opt => (
-            <label key={opt} className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 select-none">
+            <label key={opt || '__blank__'} className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 select-none">
               <input type="checkbox" checked={value.includes(opt)} onChange={() => toggle(opt)}
                 className="w-3.5 h-3.5 accent-indigo-600 shrink-0" />
-              <span className="text-xs text-gray-700 dark:text-slate-200 truncate">{opt}</span>
+              <span className={`text-xs truncate ${opt === '' ? 'italic text-gray-400 dark:text-slate-500' : 'text-gray-700 dark:text-slate-200'}`}>
+                {displayOpt(opt)}
+              </span>
             </label>
           ))}
         </div>,
@@ -964,11 +968,11 @@ export default function EpicView() {
               onChange={setFilterStates} minWidth={130} />
 
             {/* Test Owner multi-select */}
-            <MultiSelect value={filterOwners} options={activeEmployees.map(e => e.name)} placeholder="ทุก Test Owner"
+            <MultiSelect value={filterOwners} options={['', ...activeEmployees.map(e => e.name)]} placeholder="ทุก Test Owner"
               onChange={setFilterOwners} minWidth={148} />
 
             {/* Test Lead multi-select */}
-            <MultiSelect value={filterTestLeads} options={testLeadOptions} placeholder="ทุก Test Lead"
+            <MultiSelect value={filterTestLeads} options={['', ...testLeadOptions]} placeholder="ทุก Test Lead"
               onChange={setFilterTestLeads} minWidth={148} />
 
             {/* Iteration single select */}
