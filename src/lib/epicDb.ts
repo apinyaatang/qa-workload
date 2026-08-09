@@ -1,6 +1,24 @@
 import { supabase, isConfigured } from './supabase'
-import { calcTestDate } from '../utils/planningCsvParser'
+import { subtractWorkingDaysH } from '../utils/workingDayUtils'
 import type { Epic, AzureDevOpsConfig } from '../types/epic'
+
+export function calcEpicTestDate(
+  uatDate: string | null,
+  targetDate: string | null,
+  estimateDays: number | null,
+  holidays: Set<string> = new Set(),
+): string | null {
+  const base = uatDate || targetDate
+  if (!base) return null
+  const baseDate = new Date(base + 'T00:00:00')
+  if (isNaN(baseDate.getTime())) return null
+  if (estimateDays != null && estimateDays > 0) {
+    return subtractWorkingDaysH(baseDate, estimateDays, holidays).toISOString().slice(0, 10)
+  }
+  const d = new Date(baseDate)
+  d.setDate(d.getDate() - 1)
+  return d.toISOString().slice(0, 10)
+}
 
 // ─── Row mapper ────────────────────────────────────────────────────────────────
 
@@ -165,7 +183,7 @@ export async function syncEpicsFromAdo(
 
     const existing = existingMap.get(epicNo)
     const estDay   = existing?.test_estimate_day ?? null
-    const testDate = calcTestDate(uatDate, targetDate, estDay, holidays)
+    const testDate = calcEpicTestDate(uatDate, targetDate, estDay, holidays)
 
     const adoFields = {
       epic_no:   epicNo,

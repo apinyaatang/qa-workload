@@ -2,11 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   RefreshCw, Loader2, AlertCircle, X, CloudDownload, ChevronDown,
-  AlertTriangle, ArrowUp, ArrowDown,
+  AlertTriangle, ArrowUp, ArrowDown, Maximize2, Minimize2,
 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
-import { epicDb, syncEpicsFromAdo } from '../../lib/epicDb'
-import { calcTestDate } from '../../utils/planningCsvParser'
+import { epicDb, syncEpicsFromAdo, calcEpicTestDate } from '../../lib/epicDb'
 import TesterGanttView from '../planning/TesterGanttView'
 import type { Epic, AzureDevOpsConfig } from '../../types/epic'
 import type { PlanningProject } from '../../types/planning'
@@ -275,11 +274,84 @@ function TabBtn({ active, onClick, label, count }: {
 
 // ─── Epic Table ───────────────────────────────────────────────────────────────
 
+function stripBuzzebees(path: string): string {
+  return path.replace(/^Buzzebees\\/i, '').trim()
+}
+
+// ─── Stable inline-edit cells (defined at module level to preserve state) ─────
+
+function InlineNumber({ id, value, field, unit, min, max, onSave }: {
+  id: string; value: number | null; field: keyof Epic; unit?: string
+  min?: number; max?: number; onSave: (id: string, patch: Partial<Epic>) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value != null ? String(value) : '')
+  const inputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (editing) inputRef.current?.focus() }, [editing])
+
+  function commit() {
+    setEditing(false)
+    const n = draft.trim() === '' ? null : Number(draft)
+    const v = isNaN(n as number) ? null : n
+    if (v !== value) onSave(id, { [field]: v } as any)
+  }
+
+  if (editing) {
+    return <input ref={inputRef} type="number" value={draft} min={min} max={max}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value != null ? String(value) : ''); setEditing(false) } }}
+      className="border border-indigo-400 rounded px-1.5 py-0.5 text-xs bg-white dark:bg-slate-700 dark:text-slate-100 focus:outline-none w-20" />
+  }
+  return (
+    <span onClick={() => { setDraft(value != null ? String(value) : ''); setEditing(true) }}
+      className="cursor-text rounded px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-slate-600 text-xs">
+      {value != null ? `${value}${unit ?? ''}` : <span className="text-gray-400 italic">—</span>}
+    </span>
+  )
+}
+
+function InlineText({ id, value, field, multiline, onSave }: {
+  id: string; value: string; field: keyof Epic; multiline?: boolean
+  onSave: (id: string, patch: Partial<Epic>) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const ref = useRef<HTMLInputElement & HTMLTextAreaElement>(null)
+  useEffect(() => { if (editing) ref.current?.focus() }, [editing])
+
+  function commit() {
+    setEditing(false)
+    if (draft !== value) onSave(id, { [field]: draft } as any)
+  }
+
+  const cls = 'border border-indigo-400 rounded px-1.5 py-0.5 text-xs bg-white dark:bg-slate-700 dark:text-slate-100 focus:outline-none w-full'
+  if (editing) {
+    return multiline
+      ? <textarea ref={ref as any} value={draft} rows={2} onChange={e => setDraft(e.target.value)} onBlur={commit}
+          onKeyDown={e => { if (e.key === 'Escape') { setDraft(value); setEditing(false) } }}
+          className={`${cls} resize-none min-w-[160px]`} />
+      : <input ref={ref as any} value={draft} onChange={e => setDraft(e.target.value)} onBlur={commit}
+          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false) } }}
+          className={cls} style={{ minWidth: 120 }} />
+  }
+  return (
+    <div onClick={() => { setDraft(value); setEditing(true) }}
+      className="cursor-text rounded px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-slate-600 max-w-[180px]">
+      {value
+        ? <span className="block truncate text-xs">{value}</span>
+        : <span className="text-gray-400 italic text-[11px]">—</span>}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 type SortField = 'epicNo' | 'state' | 'targetDate' | 'uatDate' | 'testDate' | 'testEstimateDay' | 'testingPercent' | 'testOwner'
 
 interface TableProps {
   rows: Epic[]
-  epics: Epic[]                          // full list for optimistic update source
+  epics: Epic[]
   savingIds: Set<string>
   employees: { id: string; name: string }[]
   testerFlags: string[]
@@ -287,9 +359,11 @@ interface TableProps {
   onSort: (f: SortField) => void
   onSave: (id: string, patch: Partial<Epic>) => void
   today: Date
+  expanded: boolean
+  onToggleExpand: () => void
 }
 
-function EpicTable({ rows, savingIds, employees, testerFlags, sort, onSort, onSave, today }: TableProps) {
+function EpicTable({ rows, savingIds, employees, testerFlags, sort, onSort, onSave, today, expanded, onToggleExpand }: TableProps) {
   const todayIso = today.toISOString().slice(0, 10)
   const empNames = employees.map(e => e.name)
 
@@ -303,73 +377,15 @@ function EpicTable({ rows, savingIds, employees, testerFlags, sort, onSort, onSa
       : <ArrowDown size={11} className="inline ml-1 text-blue-600" />
   }
 
-  function InlineNumber({ id, value, field, unit, min, max }: {
-    id: string; value: number | null; field: keyof Epic; unit?: string; min?: number; max?: number
-  }) {
-    const [editing, setEditing] = useState(false)
-    const [draft, setDraft] = useState(value != null ? String(value) : '')
-    const inputRef = useRef<HTMLInputElement>(null)
-    useEffect(() => { if (editing) inputRef.current?.focus() }, [editing])
-
-    function commit() {
-      setEditing(false)
-      const n = draft.trim() === '' ? null : Number(draft)
-      const v = isNaN(n as number) ? null : n
-      if (v !== value) onSave(id, { [field]: v } as any)
-    }
-
-    if (editing) {
-      return <input ref={inputRef} type="number" value={draft} min={min} max={max}
-        onChange={e => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value != null ? String(value) : ''); setEditing(false) } }}
-        className="border border-indigo-400 rounded px-1.5 py-0.5 text-xs bg-white dark:bg-slate-700 dark:text-slate-100 focus:outline-none w-20" />
-    }
-
-    return (
-      <span onClick={() => { setDraft(value != null ? String(value) : ''); setEditing(true) }}
-        className="cursor-text rounded px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-slate-600 text-xs">
-        {value != null ? `${value}${unit ?? ''}` : <span className="text-gray-400 italic">—</span>}
-      </span>
-    )
-  }
-
-  function InlineText({ id, value, field, multiline }: {
-    id: string; value: string; field: keyof Epic; multiline?: boolean
-  }) {
-    const [editing, setEditing] = useState(false)
-    const [draft, setDraft] = useState(value)
-    const ref = useRef<HTMLInputElement & HTMLTextAreaElement>(null)
-    useEffect(() => { if (editing) ref.current?.focus() }, [editing])
-
-    function commit() {
-      setEditing(false)
-      if (draft !== value) onSave(id, { [field]: draft } as any)
-    }
-
-    const cls = 'border border-indigo-400 rounded px-1.5 py-0.5 text-xs bg-white dark:bg-slate-700 dark:text-slate-100 focus:outline-none w-full'
-    if (editing) {
-      return multiline
-        ? <textarea ref={ref as any} value={draft} rows={2} onChange={e => setDraft(e.target.value)} onBlur={commit}
-            onKeyDown={e => { if (e.key === 'Escape') { setDraft(value); setEditing(false) } }}
-            className={`${cls} resize-none min-w-[160px]`} />
-        : <input ref={ref as any} value={draft} onChange={e => setDraft(e.target.value)} onBlur={commit}
-            onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false) } }}
-            className={cls} style={{ minWidth: 120 }} />
-    }
-
-    return (
-      <div onClick={() => { setDraft(value); setEditing(true) }}
-        className="cursor-text rounded px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-slate-600 max-w-[180px]">
-        {value
-          ? <span className="block truncate text-xs">{value}</span>
-          : <span className="text-gray-400 italic text-[11px]">—</span>}
-      </div>
-    )
-  }
-
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm">
+    <div>
+      <div className="flex justify-end mb-2">
+        <button onClick={onToggleExpand}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-600 transition-colors">
+          {expanded ? <><Minimize2 size={13} /> ย่อตาราง</> : <><Maximize2 size={13} /> ขยายตาราง</>}
+        </button>
+      </div>
+    <div className={`overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm ${expanded ? 'max-h-[calc(100vh-10rem)]' : 'max-h-[calc(100vh-22rem)]'} overflow-y-auto`}>
       <table className="min-w-full border-collapse text-sm">
         <thead>
           <tr>
@@ -409,7 +425,7 @@ function EpicTable({ rows, savingIds, employees, testerFlags, sort, onSort, onSa
                   <span className="block truncate text-xs" title={epic.iteration}>{epic.iteration || '—'}</span>
                 </td>
                 <td className={`${tdBase} max-w-[150px]`}>
-                  <span className="block truncate text-xs" title={epic.project}>{epic.project || '—'}</span>
+                  <span className="block truncate text-xs" title={epic.project}>{stripBuzzebees(epic.project) || '—'}</span>
                 </td>
                 <td className={`${tdBase} max-w-[220px]`}>
                   <span className="block truncate font-medium" title={epic.feature}>{epic.feature || '—'}</span>
@@ -431,20 +447,18 @@ function EpicTable({ rows, savingIds, employees, testerFlags, sort, onSort, onSa
 
                 {/* ── Editable: Est. Day ── */}
                 <td className={`${tdBase} text-center`}>
-                  <InlineNumber id={epic.id} value={epic.testEstimateDay} field="testEstimateDay" unit="d" min={0} />
+                  <InlineNumber id={epic.id} value={epic.testEstimateDay} field="testEstimateDay" unit="d" min={0} onSave={onSave} />
                 </td>
 
                 {/* ── Editable: Testing % ── */}
                 <td className={`${tdBase} min-w-[90px]`}>
                   {epic.testingPercent != null ? (
-                    <div className="flex items-center gap-1.5 cursor-pointer" onClick={() => {}}>
-                      <div className="w-10 h-1.5 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden">
-                        <div className={`h-full rounded-full ${epic.testingPercent >= 100 ? 'bg-green-500' : epic.testingPercent >= 50 ? 'bg-blue-400' : 'bg-orange-400'}`}
-                          style={{ width: `${Math.min(100, epic.testingPercent)}%` }} />
-                      </div>
+                    <div className="w-16 h-1.5 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden mb-0.5">
+                      <div className={`h-full rounded-full ${epic.testingPercent >= 100 ? 'bg-green-500' : epic.testingPercent >= 50 ? 'bg-blue-400' : 'bg-orange-400'}`}
+                        style={{ width: `${Math.min(100, epic.testingPercent)}%` }} />
                     </div>
                   ) : null}
-                  <InlineNumber id={epic.id} value={epic.testingPercent} field="testingPercent" unit="%" min={0} max={100} />
+                  <InlineNumber id={epic.id} value={epic.testingPercent} field="testingPercent" unit="%" min={0} max={100} onSave={onSave} />
                 </td>
 
                 {/* ── Editable: Tester Flag ── */}
@@ -458,7 +472,7 @@ function EpicTable({ rows, savingIds, employees, testerFlags, sort, onSort, onSa
 
                 {/* ── Editable: Tester Note ── */}
                 <td className={tdBase}>
-                  <InlineText id={epic.id} value={epic.testerNote} field="testerNote" multiline />
+                  <InlineText id={epic.id} value={epic.testerNote} field="testerNote" multiline onSave={onSave} />
                 </td>
 
                 {/* ── Editable: Test Owner ── */}
@@ -474,13 +488,14 @@ function EpicTable({ rows, savingIds, employees, testerFlags, sort, onSort, onSa
 
                 {/* ── Editable: Test Lead ── */}
                 <td className={tdBase}>
-                  <InlineText id={epic.id} value={epic.testLead} field="testLead" />
+                  <InlineText id={epic.id} value={epic.testLead} field="testLead" onSave={onSave} />
                 </td>
               </tr>
             )
           })}
         </tbody>
       </table>
+    </div>
     </div>
   )
 }
@@ -506,6 +521,7 @@ export default function EpicView() {
   const [showSync,    setShowSync]    = useState(false)
   const [syncing,     setSyncing]     = useState(false)
   const [syncMsg,     setSyncMsg]     = useState<string | null>(null)
+  const [expanded,    setExpanded]    = useState(false)
 
   // Filters
   const [search,       setSearch]       = useState('')
@@ -551,7 +567,7 @@ export default function EpicView() {
     const updated = { ...epic, ...patch }
     // Recalculate test_date if estimate or uat/target changed
     if ('testEstimateDay' in patch || 'uatDate' in patch || 'targetDate' in patch) {
-      updated.testDate = calcTestDate(updated.uatDate, updated.targetDate, updated.testEstimateDay, holidaySet)
+      updated.testDate = calcEpicTestDate(updated.uatDate, updated.targetDate, updated.testEstimateDay, holidaySet)
     }
     setEpics(prev => prev.map(e => e.id === id ? updated : e))
     setSavingIds(prev => new Set([...prev, id]))
@@ -760,6 +776,7 @@ export default function EpicView() {
               rows={tableRows} epics={epics} savingIds={savingIds}
               employees={activeEmployees} testerFlags={testerFlags}
               sort={sort} onSort={handleSort} onSave={handleSave} today={today}
+              expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
             />
           ) : tab === 'gantt' ? (
             <TesterGanttView
@@ -773,6 +790,7 @@ export default function EpicView() {
               rows={deployRows} epics={epics} savingIds={savingIds}
               employees={activeEmployees} testerFlags={testerFlags}
               sort={sort} onSort={handleSort} onSave={handleSave} today={today}
+              expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
             />
           ) : tab === 'delayplan' ? (
             <div>
@@ -784,6 +802,7 @@ export default function EpicView() {
                 rows={delayRows} epics={epics} savingIds={savingIds}
                 employees={activeEmployees} testerFlags={testerFlags}
                 sort={sort} onSort={handleSort} onSave={handleSave} today={today}
+                expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
               />
             </div>
           ) : null}
