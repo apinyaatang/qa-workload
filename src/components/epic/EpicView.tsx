@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   RefreshCw, Loader2, AlertCircle, X, CloudDownload, ChevronDown,
-  AlertTriangle, ArrowUp, ArrowDown, Maximize2, Minimize2,
+  AlertTriangle, ArrowUp, ArrowDown, Maximize2, Minimize2, SlidersHorizontal,
 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { epicDb, syncEpicsFromAdo, calcEpicTestDate } from '../../lib/epicDb'
@@ -345,15 +345,57 @@ function InlineText({ id, value, field, multiline, onSave }: {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Column definitions ───────────────────────────────────────────────────────
 
+const COL_DEFS = [
+  { key: 'no',         label: '#',           sortField: null,              hideable: false, defaultW: 42  },
+  { key: 'epicNo',     label: 'Epic No',     sortField: 'epicNo',          hideable: true,  defaultW: 90  },
+  { key: 'iteration',  label: 'Iteration',   sortField: null,              hideable: true,  defaultW: 150 },
+  { key: 'project',    label: 'Project',     sortField: null,              hideable: true,  defaultW: 160 },
+  { key: 'feature',    label: 'Feature',     sortField: null,              hideable: true,  defaultW: 230 },
+  { key: 'type',       label: 'Type',        sortField: null,              hideable: true,  defaultW: 80  },
+  { key: 'state',      label: 'State',       sortField: 'state',           hideable: true,  defaultW: 110 },
+  { key: 'uatDate',    label: 'UAT Date',    sortField: 'uatDate',         hideable: true,  defaultW: 100 },
+  { key: 'targetDate', label: 'Target Date', sortField: 'targetDate',      hideable: true,  defaultW: 100 },
+  { key: 'sitDate',    label: 'SIT Date',    sortField: null,              hideable: true,  defaultW: 100 },
+  { key: 'testDate',   label: 'Test Date',   sortField: 'testDate',        hideable: true,  defaultW: 100 },
+  { key: 'estDay',     label: 'Est.(d)',      sortField: 'testEstimateDay', hideable: true,  defaultW: 72  },
+  { key: 'testingPct', label: 'Testing %',   sortField: 'testingPercent',  hideable: true,  defaultW: 100 },
+  { key: 'testerFlag', label: 'Tester Flag', sortField: null,              hideable: true,  defaultW: 190 },
+  { key: 'testerNote', label: 'Tester Note', sortField: null,              hideable: true,  defaultW: 190 },
+  { key: 'testOwner',  label: 'Test Owner',  sortField: 'testOwner',       hideable: true,  defaultW: 170 },
+  { key: 'testLead',   label: 'Test Lead',   sortField: null,              hideable: true,  defaultW: 180 },
+] as const
+
+type ColKey = typeof COL_DEFS[number]['key']
 type SortField = 'epicNo' | 'state' | 'targetDate' | 'uatDate' | 'testDate' | 'testEstimateDay' | 'testingPercent' | 'testOwner'
+
+const LS_VIS  = 'epic_visible_cols'
+const LS_WIDS = 'epic_col_widths'
+
+function initVisibleCols(): Set<ColKey> {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LS_VIS) ?? 'null')
+    if (Array.isArray(saved)) return new Set(saved as ColKey[])
+  } catch {}
+  return new Set(COL_DEFS.map(c => c.key))
+}
+function initColWidths(): Record<string, number> {
+  const defaults = Object.fromEntries(COL_DEFS.map(c => [c.key, c.defaultW]))
+  try {
+    const saved = JSON.parse(localStorage.getItem(LS_WIDS) ?? 'null')
+    if (saved && typeof saved === 'object') return { ...defaults, ...saved }
+  } catch {}
+  return defaults
+}
+
+// ─── EpicTable ────────────────────────────────────────────────────────────────
 
 interface TableProps {
   rows: Epic[]
   epics: Epic[]
   savingIds: Set<string>
-  employees: { id: string; name: string }[]
+  employees: { id: string; name: string; displayName: string }[]
   testerFlags: string[]
   sort: { field: SortField; dir: 'asc' | 'desc' }
   onSort: (f: SortField) => void
@@ -364,138 +406,212 @@ interface TableProps {
 }
 
 function EpicTable({ rows, savingIds, employees, testerFlags, sort, onSort, onSave, today, expanded, onToggleExpand }: TableProps) {
-  const todayIso = today.toISOString().slice(0, 10)
-  const empNames = employees.map(e => e.name)
+  const todayIso   = today.toISOString().slice(0, 10)
+  const empNames   = employees.map(e => e.name)
+  const leadNames  = employees.map(e => e.displayName)
 
-  const thBase = 'px-3 py-2.5 text-left text-[11px] font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide whitespace-nowrap bg-gray-50 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-600'
-  const tdBase = 'px-3 py-2 text-xs text-gray-700 dark:text-slate-200 border-b border-gray-100 dark:border-slate-700 align-middle'
+  const [visibleCols, setVisibleCols] = useState<Set<ColKey>>(initVisibleCols)
+  const [colWidths,   setColWidths]   = useState<Record<string, number>>(initColWidths)
+  const [showColPanel, setShowColPanel] = useState(false)
+  const colPanelRef = useRef<HTMLDivElement>(null)
+  const resizeDrag  = useRef<{ col: string; startX: number; startW: number } | null>(null)
 
-  function SortIcon({ field }: { field: SortField }) {
-    if (sort.field !== field) return <span className="text-gray-300 ml-1">↕</span>
-    return sort.dir === 'asc'
-      ? <ArrowUp size={11} className="inline ml-1 text-blue-600" />
-      : <ArrowDown size={11} className="inline ml-1 text-blue-600" />
+  // Persist visibility
+  useEffect(() => {
+    localStorage.setItem(LS_VIS, JSON.stringify([...visibleCols]))
+  }, [visibleCols])
+  // Persist widths
+  useEffect(() => {
+    localStorage.setItem(LS_WIDS, JSON.stringify(colWidths))
+  }, [colWidths])
+
+  // Close column panel on outside click
+  useEffect(() => {
+    if (!showColPanel) return
+    function h(e: MouseEvent) {
+      if (!colPanelRef.current?.contains(e.target as Node)) setShowColPanel(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [showColPanel])
+
+  // Column resize
+  function startResize(e: React.MouseEvent, colKey: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    resizeDrag.current = { col: colKey, startX: e.clientX, startW: colWidths[colKey] ?? 100 }
+    function onMove(ev: MouseEvent) {
+      if (!resizeDrag.current) return
+      const delta = ev.clientX - resizeDrag.current.startX
+      const newW  = Math.max(48, resizeDrag.current.startW + delta)
+      setColWidths(prev => ({ ...prev, [resizeDrag.current!.col]: newW }))
+    }
+    function onUp() {
+      resizeDrag.current = null
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup',   onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup',   onUp)
   }
+
+  const vis = (k: ColKey) => visibleCols.has(k)
+
+  const thBase = 'px-2 py-2.5 text-left text-[11px] font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide whitespace-nowrap bg-gray-50 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-600 relative select-none overflow-hidden'
+  const tdBase = 'px-2 py-2 text-xs text-gray-700 dark:text-slate-200 border-b border-gray-100 dark:border-slate-700 align-middle overflow-hidden'
+
+  function Th({ colKey, label, sortField, children }: { colKey: ColKey; label?: string; sortField?: SortField | null; children?: React.ReactNode }) {
+    const w = colWidths[colKey]
+    return (
+      <th className={thBase} style={{ width: w, minWidth: w, maxWidth: w }}
+        onClick={() => sortField && onSort(sortField)}>
+        <div className={`flex items-center gap-0.5 ${sortField ? 'cursor-pointer' : ''}`}>
+          <span className="truncate">{children ?? label}</span>
+          {sortField && (sort.field === sortField
+            ? (sort.dir === 'asc' ? <ArrowUp size={10} className="shrink-0 text-blue-600" /> : <ArrowDown size={10} className="shrink-0 text-blue-600" />)
+            : <span className="text-gray-300 text-[10px] shrink-0">↕</span>
+          )}
+        </div>
+        {/* resize handle */}
+        <div
+          onMouseDown={e => startResize(e, colKey)}
+          style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 5, cursor: 'col-resize', zIndex: 1 }}
+          className="hover:bg-indigo-400/50"
+          onClick={e => e.stopPropagation()}
+        />
+      </th>
+    )
+  }
+
+  const visCount = COL_DEFS.filter(c => c.hideable && vis(c.key)).length
 
   return (
     <div>
-      <div className="flex justify-end mb-2">
+      {/* Toolbar */}
+      <div className="flex items-center justify-end gap-2 mb-2">
+        {/* Column visibility */}
+        <div className="relative" ref={colPanelRef}>
+          <button onClick={() => setShowColPanel(s => !s)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-600 transition-colors">
+            <SlidersHorizontal size={13} /> คอลัมน์ ({visCount}/{COL_DEFS.filter(c => c.hideable).length})
+          </button>
+          {showColPanel && (
+            <div className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl shadow-xl p-3 min-w-[200px] max-h-96 overflow-y-auto">
+              <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100 dark:border-slate-700">
+                <span className="text-xs font-semibold text-gray-600 dark:text-slate-300">แสดง/ซ่อน คอลัมน์</span>
+                <div className="flex gap-1">
+                  <button onClick={() => setVisibleCols(new Set(COL_DEFS.map(c => c.key)))} className="text-[10px] text-indigo-500 hover:underline">ทั้งหมด</button>
+                  <span className="text-gray-300">·</span>
+                  <button onClick={() => setVisibleCols(new Set(COL_DEFS.filter(c => !c.hideable).map(c => c.key)))} className="text-[10px] text-gray-400 hover:underline">ซ่อนทั้งหมด</button>
+                </div>
+              </div>
+              {COL_DEFS.filter(c => c.hideable).map(col => (
+                <label key={col.key} className="flex items-center gap-2 py-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 rounded px-1">
+                  <input type="checkbox" checked={vis(col.key)}
+                    onChange={() => setVisibleCols(prev => {
+                      const next = new Set(prev)
+                      next.has(col.key) ? next.delete(col.key) : next.add(col.key)
+                      return next
+                    })}
+                    className="w-3.5 h-3.5 accent-indigo-600" />
+                  <span className="text-xs text-gray-700 dark:text-slate-200">{col.label}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* Expand */}
         <button onClick={onToggleExpand}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-600 transition-colors">
           {expanded ? <><Minimize2 size={13} /> ย่อตาราง</> : <><Maximize2 size={13} /> ขยายตาราง</>}
         </button>
       </div>
-    <div className={`overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm ${expanded ? 'max-h-[calc(100vh-10rem)]' : 'max-h-[calc(100vh-22rem)]'} overflow-y-auto`}>
-      <table className="min-w-full border-collapse text-sm">
-        <thead>
-          <tr>
-            <th className={`${thBase} w-8`}>#</th>
-            <th className={`${thBase} cursor-pointer`} onClick={() => onSort('epicNo')}>Epic No<SortIcon field="epicNo" /></th>
-            <th className={thBase} style={{ minWidth: 120 }}>Iteration</th>
-            <th className={thBase} style={{ minWidth: 140 }}>Project (Area)</th>
-            <th className={thBase} style={{ minWidth: 200 }}>Feature (Title)</th>
-            <th className={thBase} style={{ minWidth: 80 }}>Type</th>
-            <th className={`${thBase} cursor-pointer`} style={{ minWidth: 120 }} onClick={() => onSort('state')}>State<SortIcon field="state" /></th>
-            <th className={`${thBase} cursor-pointer`} onClick={() => onSort('uatDate')}>UAT Date<SortIcon field="uatDate" /></th>
-            <th className={`${thBase} cursor-pointer`} onClick={() => onSort('targetDate')}>Target Date<SortIcon field="targetDate" /></th>
-            <th className={thBase}>SIT Date</th>
-            <th className={`${thBase} cursor-pointer`} onClick={() => onSort('testDate')}>Test Date<SortIcon field="testDate" /></th>
-            <th className={`${thBase} cursor-pointer`} onClick={() => onSort('testEstimateDay')}>Est.(d)<SortIcon field="testEstimateDay" /></th>
-            <th className={`${thBase} cursor-pointer`} onClick={() => onSort('testingPercent')}>Testing %<SortIcon field="testingPercent" /></th>
-            <th className={thBase} style={{ minWidth: 160 }}>Tester Flag</th>
-            <th className={thBase} style={{ minWidth: 160 }}>Tester Note</th>
-            <th className={`${thBase} cursor-pointer`} style={{ minWidth: 150 }} onClick={() => onSort('testOwner')}>Test Owner<SortIcon field="testOwner" /></th>
-            <th className={thBase} style={{ minWidth: 130 }}>Test Lead</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 && (
-            <tr><td colSpan={17} className="py-12 text-center text-sm text-gray-400">ไม่มีข้อมูล Epic ที่ตรงกับ Filter</td></tr>
-          )}
-          {rows.map((epic, idx) => {
-            const isSaving = savingIds.has(epic.id)
-            const isDelay  = isDelayPlan(epic, todayIso)
-            const targetNear = !!epic.targetDate && epic.targetDate >= todayIso && epic.targetDate <= new Date(today.getTime() + 7 * 86400000).toISOString().slice(0, 10)
-            const rowBg = isSaving ? 'bg-blue-50/40 dark:bg-blue-900/10' : isDelay ? 'bg-amber-50/30 dark:bg-amber-900/10' : 'bg-white dark:bg-slate-800'
-            return (
-              <tr key={epic.id} className={`${rowBg} hover:bg-blue-50/30 dark:hover:bg-slate-700/40 transition-colors`}>
-                <td className={`${tdBase} text-center text-gray-400`}>{idx + 1}</td>
-                <td className={`${tdBase} font-mono text-blue-700 dark:text-blue-300 whitespace-nowrap`}>{epic.epicNo}</td>
-                <td className={`${tdBase} max-w-[140px]`}>
-                  <span className="block truncate text-xs" title={epic.iteration}>{epic.iteration || '—'}</span>
-                </td>
-                <td className={`${tdBase} max-w-[150px]`}>
-                  <span className="block truncate text-xs" title={epic.project}>{stripBuzzebees(epic.project) || '—'}</span>
-                </td>
-                <td className={`${tdBase} max-w-[220px]`}>
-                  <span className="block truncate font-medium" title={epic.feature}>{epic.feature || '—'}</span>
-                </td>
-                <td className={tdBase}>
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 whitespace-nowrap">{epic.itemType || '—'}</span>
-                </td>
-                <td className={`${tdBase} whitespace-nowrap`}>
-                  <span className="text-xs">{epic.state || '—'}</span>
-                </td>
-                <td className={`${tdBase} whitespace-nowrap text-xs`}>{fmt(epic.uatDate)}</td>
-                <td className={`${tdBase} whitespace-nowrap`}>
-                  <span className={`text-xs ${targetNear ? 'font-bold text-orange-600' : ''}`}>{fmt(epic.targetDate)}</span>
-                </td>
-                <td className={`${tdBase} whitespace-nowrap text-xs`}>{fmt(epic.sitDate)}</td>
-                <td className={`${tdBase} whitespace-nowrap`}>
-                  <span className={`text-xs ${!!epic.testDate && epic.testDate < todayIso ? 'text-red-600 font-semibold' : ''}`}>{fmt(epic.testDate)}</span>
-                </td>
 
-                {/* ── Editable: Est. Day ── */}
-                <td className={`${tdBase} text-center`}>
-                  <InlineNumber id={epic.id} value={epic.testEstimateDay} field="testEstimateDay" unit="d" min={0} onSave={onSave} />
-                </td>
-
-                {/* ── Editable: Testing % ── */}
-                <td className={`${tdBase} min-w-[90px]`}>
-                  {epic.testingPercent != null ? (
-                    <div className="w-16 h-1.5 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden mb-0.5">
-                      <div className={`h-full rounded-full ${epic.testingPercent >= 100 ? 'bg-green-500' : epic.testingPercent >= 50 ? 'bg-blue-400' : 'bg-orange-400'}`}
-                        style={{ width: `${Math.min(100, epic.testingPercent)}%` }} />
-                    </div>
-                  ) : null}
-                  <InlineNumber id={epic.id} value={epic.testingPercent} field="testingPercent" unit="%" min={0} max={100} onSave={onSave} />
-                </td>
-
-                {/* ── Editable: Tester Flag ── */}
-                <td className={tdBase}>
-                  <TesterFlagCell
-                    selected={epic.testerFlag}
-                    masterFlags={testerFlags}
-                    onChange={v => onSave(epic.id, { testerFlag: v })}
-                  />
-                </td>
-
-                {/* ── Editable: Tester Note ── */}
-                <td className={tdBase}>
-                  <InlineText id={epic.id} value={epic.testerNote} field="testerNote" multiline onSave={onSave} />
-                </td>
-
-                {/* ── Editable: Test Owner ── */}
-                <td className={tdBase}>
-                  <PortalSelect
-                    value={epic.testOwner}
-                    options={empNames}
-                    placeholder="— Test Owner —"
-                    onChange={v => onSave(epic.id, { testOwner: v })}
-                    minWidth={180}
-                  />
-                </td>
-
-                {/* ── Editable: Test Lead ── */}
-                <td className={tdBase}>
-                  <InlineText id={epic.id} value={epic.testLead} field="testLead" onSave={onSave} />
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
+      {/* Table */}
+      <div className={`overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm ${expanded ? 'max-h-[calc(100vh-10rem)]' : 'max-h-[calc(100vh-22rem)]'} overflow-y-auto`}>
+        <table className="border-collapse text-sm" style={{ tableLayout: 'fixed', width: COL_DEFS.filter(c => vis(c.key)).reduce((s, c) => s + (colWidths[c.key] ?? c.defaultW), 0) }}>
+          <colgroup>
+            {COL_DEFS.filter(c => vis(c.key)).map(c => (
+              <col key={c.key} style={{ width: colWidths[c.key] ?? c.defaultW }} />
+            ))}
+          </colgroup>
+          <thead>
+            <tr>
+              {vis('no')         && <Th colKey="no"         label="#" />}
+              {vis('epicNo')     && <Th colKey="epicNo"     label="Epic No"     sortField="epicNo" />}
+              {vis('iteration')  && <Th colKey="iteration"  label="Iteration" />}
+              {vis('project')    && <Th colKey="project"    label="Project" />}
+              {vis('feature')    && <Th colKey="feature"    label="Feature" />}
+              {vis('type')       && <Th colKey="type"       label="Type" />}
+              {vis('state')      && <Th colKey="state"      label="State"       sortField="state" />}
+              {vis('uatDate')    && <Th colKey="uatDate"    label="UAT Date"    sortField="uatDate" />}
+              {vis('targetDate') && <Th colKey="targetDate" label="Target Date" sortField="targetDate" />}
+              {vis('sitDate')    && <Th colKey="sitDate"    label="SIT Date" />}
+              {vis('testDate')   && <Th colKey="testDate"   label="Test Date"   sortField="testDate" />}
+              {vis('estDay')     && <Th colKey="estDay"     label="Est.(d)"      sortField="testEstimateDay" />}
+              {vis('testingPct') && <Th colKey="testingPct" label="Testing %"   sortField="testingPercent" />}
+              {vis('testerFlag') && <Th colKey="testerFlag" label="Tester Flag" />}
+              {vis('testerNote') && <Th colKey="testerNote" label="Tester Note" />}
+              {vis('testOwner')  && <Th colKey="testOwner"  label="Test Owner"  sortField="testOwner" />}
+              {vis('testLead')   && <Th colKey="testLead"   label="Test Lead" />}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={visibleCols.size} className="py-12 text-center text-sm text-gray-400">ไม่มีข้อมูล Epic ที่ตรงกับ Filter</td></tr>
+            )}
+            {rows.map((epic, idx) => {
+              const isSaving   = savingIds.has(epic.id)
+              const isDelay    = isDelayPlan(epic, todayIso)
+              const targetNear = !!epic.targetDate && epic.targetDate >= todayIso && epic.targetDate <= new Date(today.getTime() + 7 * 86400000).toISOString().slice(0, 10)
+              const rowBg      = isSaving ? 'bg-blue-50/40 dark:bg-blue-900/10' : isDelay ? 'bg-amber-50/30 dark:bg-amber-900/10' : 'bg-white dark:bg-slate-800'
+              return (
+                <tr key={epic.id} className={`${rowBg} hover:bg-blue-50/30 dark:hover:bg-slate-700/40 transition-colors`}>
+                  {vis('no')         && <td className={`${tdBase} text-center text-gray-400 text-[11px]`}>{idx + 1}</td>}
+                  {vis('epicNo')     && <td className={`${tdBase} font-mono text-blue-700 dark:text-blue-300`}>{epic.epicNo}</td>}
+                  {vis('iteration')  && <td className={tdBase}><span className="block truncate text-xs" title={epic.iteration}>{epic.iteration || '—'}</span></td>}
+                  {vis('project')    && <td className={tdBase}><span className="block truncate text-xs" title={epic.project}>{stripBuzzebees(epic.project) || '—'}</span></td>}
+                  {vis('feature')    && <td className={tdBase}><span className="block truncate font-medium text-xs" title={epic.feature}>{epic.feature || '—'}</span></td>}
+                  {vis('type')       && <td className={tdBase}><span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 truncate block">{epic.itemType || '—'}</span></td>}
+                  {vis('state')      && <td className={tdBase}><span className="text-xs truncate block">{epic.state || '—'}</span></td>}
+                  {vis('uatDate')    && <td className={`${tdBase} whitespace-nowrap text-xs`}>{fmt(epic.uatDate)}</td>}
+                  {vis('targetDate') && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${targetNear ? 'font-bold text-orange-600' : ''}`}>{fmt(epic.targetDate)}</span></td>}
+                  {vis('sitDate')    && <td className={`${tdBase} whitespace-nowrap text-xs`}>{fmt(epic.sitDate)}</td>}
+                  {vis('testDate')   && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${!!epic.testDate && epic.testDate < todayIso ? 'text-red-600 font-semibold' : ''}`}>{fmt(epic.testDate)}</span></td>}
+                  {vis('estDay')     && <td className={`${tdBase} text-center`}><InlineNumber id={epic.id} value={epic.testEstimateDay} field="testEstimateDay" unit="d" min={0} onSave={onSave} /></td>}
+                  {vis('testingPct') && (
+                    <td className={tdBase}>
+                      {epic.testingPercent != null && (
+                        <div className="w-full h-1 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden mb-0.5">
+                          <div className={`h-full rounded-full ${epic.testingPercent >= 100 ? 'bg-green-500' : epic.testingPercent >= 50 ? 'bg-blue-400' : 'bg-orange-400'}`}
+                            style={{ width: `${Math.min(100, epic.testingPercent)}%` }} />
+                        </div>
+                      )}
+                      <InlineNumber id={epic.id} value={epic.testingPercent} field="testingPercent" unit="%" min={0} max={100} onSave={onSave} />
+                    </td>
+                  )}
+                  {vis('testerFlag') && (
+                    <td className={tdBase}>
+                      <TesterFlagCell selected={epic.testerFlag} masterFlags={testerFlags} onChange={v => onSave(epic.id, { testerFlag: v })} />
+                    </td>
+                  )}
+                  {vis('testerNote') && <td className={tdBase}><InlineText id={epic.id} value={epic.testerNote} field="testerNote" multiline onSave={onSave} /></td>}
+                  {vis('testOwner')  && (
+                    <td className={tdBase}>
+                      <PortalSelect value={epic.testOwner} options={empNames} placeholder="— Test Owner —" onChange={v => onSave(epic.id, { testOwner: v })} minWidth={180} />
+                    </td>
+                  )}
+                  {vis('testLead')   && (
+                    <td className={tdBase}>
+                      <PortalSelect value={epic.testLead} options={leadNames} placeholder="— Test Lead —" onChange={v => onSave(epic.id, { testLead: v })} minWidth={200} />
+                    </td>
+                  )}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
@@ -508,7 +624,13 @@ export default function EpicView() {
   const { employees, publicHolidays } = useApp()
   const holidaySet = useMemo(() => new Set<string>(publicHolidays.map((h: any) => h.date ?? h)), [publicHolidays])
   const activeEmployees = useMemo(() =>
-    employees.filter((e: Employee) => e.isActive !== false).map((e: Employee) => ({ id: e.id, name: `${e.firstName} ${e.lastName}`.trim() }))
+    employees
+      .filter((e: Employee) => e.isActive !== false)
+      .map((e: Employee) => ({
+        id: e.id,
+        name: `${e.firstName} ${e.lastName}`.trim(),
+        displayName: `${e.firstName} ${e.lastName}${e.nickname ? ` (${e.nickname})` : ''}`.trim(),
+      }))
   , [employees])
 
   const [epics,       setEpics]       = useState<Epic[]>([])
