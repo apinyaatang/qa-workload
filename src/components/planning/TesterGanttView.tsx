@@ -74,11 +74,27 @@ interface Props {
 
 function isoToDate(iso: string): Date { return new Date(iso) }
 
+/** Snap a date backward to the nearest working day (skip weekends & holidays) */
+function snapWorkday(iso: string, holidays: Set<string>): string {
+  let ms = Date.UTC(
+    parseInt(iso.slice(0, 4)), parseInt(iso.slice(5, 7)) - 1, parseInt(iso.slice(8, 10))
+  )
+  const DAY = 86400000
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(ms)
+    const dow = d.getUTCDay()
+    const cur = d.toISOString().slice(0, 10)
+    if (dow !== 0 && dow !== 6 && !holidays.has(cur)) return cur
+    ms -= DAY
+  }
+  return iso
+}
+
 function buildBars(p: PlanningProject, holidays: Set<string>): TimelineBar[] {
   const bars: TimelineBar[] = []
-  const testDate   = p.testDate   ?? null
-  const uatDate    = p.uatDate    ?? null
-  const goLiveDate = p.goLiveDate ?? null
+  const testDate   = p.testDate   ? snapWorkday(p.testDate,   holidays) : null
+  const uatDate    = p.uatDate    ? snapWorkday(p.uatDate,    holidays) : null
+  const goLiveDate = p.goLiveDate ? snapWorkday(p.goLiveDate, holidays) : null
 
   // Anchor for Testcase Design (first non-null of testDate / uatDate / goLiveDate)
   const designAnchor = testDate ?? uatDate ?? goLiveDate
@@ -105,7 +121,7 @@ function buildBars(p: PlanningProject, holidays: Set<string>): TimelineBar[] {
   }
 
   // Feedback UAT: uatDate+1 → goLiveDate
-  if (uatDate && goLiveDate) {
+  if (uatDate && goLiveDate && uatDate !== goLiveDate) {
     const fbStart = addWorkingDaysH(isoToDate(uatDate), 1, holidays).toISOString().slice(0, 10)
     if (fbStart <= goLiveDate) {
       bars.push({ type: 'feedbackUat', startIso: fbStart, endIso: goLiveDate, isMarker: false })
