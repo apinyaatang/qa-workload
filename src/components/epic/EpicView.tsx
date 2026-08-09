@@ -355,16 +355,16 @@ const COL_DEFS = [
   { key: 'feature',    label: 'Feature',     sortField: null,              hideable: true,  defaultW: 230 },
   { key: 'type',       label: 'Type',        sortField: null,              hideable: true,  defaultW: 80  },
   { key: 'state',      label: 'State',       sortField: 'state',           hideable: true,  defaultW: 110 },
+  { key: 'testOwner',  label: 'Test Owner',  sortField: 'testOwner',       hideable: true,  defaultW: 170 },
+  { key: 'testLead',   label: 'Test Lead',   sortField: null,              hideable: true,  defaultW: 180 },
+  { key: 'estDay',     label: 'Est.(d)',      sortField: 'testEstimateDay', hideable: true,  defaultW: 72  },
+  { key: 'testDate',   label: 'Test Date',   sortField: 'testDate',        hideable: true,  defaultW: 100 },
+  { key: 'sitDate',    label: 'SIT Date',    sortField: null,              hideable: true,  defaultW: 100 },
   { key: 'uatDate',    label: 'UAT Date',    sortField: 'uatDate',         hideable: true,  defaultW: 100 },
   { key: 'targetDate', label: 'Target Date', sortField: 'targetDate',      hideable: true,  defaultW: 100 },
-  { key: 'sitDate',    label: 'SIT Date',    sortField: null,              hideable: true,  defaultW: 100 },
-  { key: 'testDate',   label: 'Test Date',   sortField: 'testDate',        hideable: true,  defaultW: 100 },
-  { key: 'estDay',     label: 'Est.(d)',      sortField: 'testEstimateDay', hideable: true,  defaultW: 72  },
   { key: 'testingPct', label: 'Testing %',   sortField: 'testingPercent',  hideable: true,  defaultW: 100 },
   { key: 'testerFlag', label: 'Tester Flag', sortField: null,              hideable: true,  defaultW: 190 },
   { key: 'testerNote', label: 'Tester Note', sortField: null,              hideable: true,  defaultW: 190 },
-  { key: 'testOwner',  label: 'Test Owner',  sortField: 'testOwner',       hideable: true,  defaultW: 170 },
-  { key: 'testLead',   label: 'Test Lead',   sortField: null,              hideable: true,  defaultW: 180 },
 ] as const
 
 type ColKey = typeof COL_DEFS[number]['key']
@@ -396,6 +396,7 @@ interface TableProps {
   epics: Epic[]
   savingIds: Set<string>
   employees: { id: string; name: string; displayName: string }[]
+  testLeadOptions: string[]
   testerFlags: string[]
   sort: { field: SortField; dir: 'asc' | 'desc' }
   onSort: (f: SortField) => void
@@ -405,10 +406,9 @@ interface TableProps {
   onToggleExpand: () => void
 }
 
-function EpicTable({ rows, savingIds, employees, testerFlags, sort, onSort, onSave, today, expanded, onToggleExpand }: TableProps) {
-  const todayIso   = today.toISOString().slice(0, 10)
-  const empNames   = employees.map(e => e.name)
-  const leadNames  = employees.map(e => e.displayName)
+function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, sort, onSort, onSave, today, expanded, onToggleExpand }: TableProps) {
+  const todayIso = today.toISOString().slice(0, 10)
+  const empNames = employees.map(e => e.name)
 
   const [visibleCols, setVisibleCols] = useState<Set<ColKey>>(initVisibleCols)
   const [colWidths,   setColWidths]   = useState<Record<string, number>>(initColWidths)
@@ -544,16 +544,16 @@ function EpicTable({ rows, savingIds, employees, testerFlags, sort, onSort, onSa
               {vis('feature')    && <Th colKey="feature"    label="Feature" />}
               {vis('type')       && <Th colKey="type"       label="Type" />}
               {vis('state')      && <Th colKey="state"      label="State"       sortField="state" />}
+              {vis('testOwner')  && <Th colKey="testOwner"  label="Test Owner"  sortField="testOwner" />}
+              {vis('testLead')   && <Th colKey="testLead"   label="Test Lead" />}
+              {vis('estDay')     && <Th colKey="estDay"     label="Est.(d)"      sortField="testEstimateDay" />}
+              {vis('testDate')   && <Th colKey="testDate"   label="Test Date"   sortField="testDate" />}
+              {vis('sitDate')    && <Th colKey="sitDate"    label="SIT Date" />}
               {vis('uatDate')    && <Th colKey="uatDate"    label="UAT Date"    sortField="uatDate" />}
               {vis('targetDate') && <Th colKey="targetDate" label="Target Date" sortField="targetDate" />}
-              {vis('sitDate')    && <Th colKey="sitDate"    label="SIT Date" />}
-              {vis('testDate')   && <Th colKey="testDate"   label="Test Date"   sortField="testDate" />}
-              {vis('estDay')     && <Th colKey="estDay"     label="Est.(d)"      sortField="testEstimateDay" />}
               {vis('testingPct') && <Th colKey="testingPct" label="Testing %"   sortField="testingPercent" />}
               {vis('testerFlag') && <Th colKey="testerFlag" label="Tester Flag" />}
               {vis('testerNote') && <Th colKey="testerNote" label="Tester Note" />}
-              {vis('testOwner')  && <Th colKey="testOwner"  label="Test Owner"  sortField="testOwner" />}
-              {vis('testLead')   && <Th colKey="testLead"   label="Test Lead" />}
             </tr>
           </thead>
           <tbody>
@@ -569,16 +569,26 @@ function EpicTable({ rows, savingIds, employees, testerFlags, sort, onSort, onSa
                 <tr key={epic.id} className={`${rowBg} hover:bg-blue-50/30 dark:hover:bg-slate-700/40 transition-colors`}>
                   {vis('no')         && <td className={`${tdBase} text-center text-gray-400 text-[11px]`}>{idx + 1}</td>}
                   {vis('epicNo')     && <td className={`${tdBase} font-mono text-blue-700 dark:text-blue-300`}>{epic.epicNo}</td>}
-                  {vis('iteration')  && <td className={tdBase}><span className="block truncate text-xs" title={epic.iteration}>{epic.iteration || '—'}</span></td>}
+                  {vis('iteration')  && <td className={tdBase}><span className="block truncate text-xs" title={epic.iteration}>{stripBuzzebees(epic.iteration) || '—'}</span></td>}
                   {vis('project')    && <td className={tdBase}><span className="block truncate text-xs" title={epic.project}>{stripBuzzebees(epic.project) || '—'}</span></td>}
                   {vis('feature')    && <td className={tdBase}><span className="block truncate font-medium text-xs" title={epic.feature}>{epic.feature || '—'}</span></td>}
                   {vis('type')       && <td className={tdBase}><span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 truncate block">{epic.itemType || '—'}</span></td>}
                   {vis('state')      && <td className={tdBase}><span className="text-xs truncate block">{epic.state || '—'}</span></td>}
+                  {vis('testOwner')  && (
+                    <td className={tdBase}>
+                      <PortalSelect value={epic.testOwner} options={empNames} placeholder="— Test Owner —" onChange={v => onSave(epic.id, { testOwner: v })} minWidth={180} />
+                    </td>
+                  )}
+                  {vis('testLead')   && (
+                    <td className={tdBase}>
+                      <PortalSelect value={epic.testLead} options={testLeadOptions} placeholder="— Test Lead —" onChange={v => onSave(epic.id, { testLead: v })} minWidth={200} />
+                    </td>
+                  )}
+                  {vis('estDay')     && <td className={`${tdBase} text-center`}><InlineNumber id={epic.id} value={epic.testEstimateDay} field="testEstimateDay" unit="d" min={0} onSave={onSave} /></td>}
+                  {vis('testDate')   && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${!!epic.testDate && epic.testDate < todayIso ? 'text-red-600 font-semibold' : ''}`}>{fmt(epic.testDate)}</span></td>}
+                  {vis('sitDate')    && <td className={`${tdBase} whitespace-nowrap text-xs`}>{fmt(epic.sitDate)}</td>}
                   {vis('uatDate')    && <td className={`${tdBase} whitespace-nowrap text-xs`}>{fmt(epic.uatDate)}</td>}
                   {vis('targetDate') && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${targetNear ? 'font-bold text-orange-600' : ''}`}>{fmt(epic.targetDate)}</span></td>}
-                  {vis('sitDate')    && <td className={`${tdBase} whitespace-nowrap text-xs`}>{fmt(epic.sitDate)}</td>}
-                  {vis('testDate')   && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${!!epic.testDate && epic.testDate < todayIso ? 'text-red-600 font-semibold' : ''}`}>{fmt(epic.testDate)}</span></td>}
-                  {vis('estDay')     && <td className={`${tdBase} text-center`}><InlineNumber id={epic.id} value={epic.testEstimateDay} field="testEstimateDay" unit="d" min={0} onSave={onSave} /></td>}
                   {vis('testingPct') && (
                     <td className={tdBase}>
                       {epic.testingPercent != null && (
@@ -596,16 +606,6 @@ function EpicTable({ rows, savingIds, employees, testerFlags, sort, onSort, onSa
                     </td>
                   )}
                   {vis('testerNote') && <td className={tdBase}><InlineText id={epic.id} value={epic.testerNote} field="testerNote" multiline onSave={onSave} /></td>}
-                  {vis('testOwner')  && (
-                    <td className={tdBase}>
-                      <PortalSelect value={epic.testOwner} options={empNames} placeholder="— Test Owner —" onChange={v => onSave(epic.id, { testOwner: v })} minWidth={180} />
-                    </td>
-                  )}
-                  {vis('testLead')   && (
-                    <td className={tdBase}>
-                      <PortalSelect value={epic.testLead} options={leadNames} placeholder="— Test Lead —" onChange={v => onSave(epic.id, { testLead: v })} minWidth={200} />
-                    </td>
-                  )}
                 </tr>
               )
             })}
@@ -631,6 +631,12 @@ export default function EpicView() {
         name: `${e.firstName} ${e.lastName}`.trim(),
         displayName: `${e.firstName} ${e.lastName}${e.nickname ? ` (${e.nickname})` : ''}`.trim(),
       }))
+  , [employees])
+
+  const testLeadOptions = useMemo(() =>
+    employees
+      .filter((e: Employee) => e.isActive !== false && (e.position === 'QA Manager' || e.position === 'QA Lead'))
+      .map((e: Employee) => `${e.firstName} ${e.lastName}${e.nickname ? ` (${e.nickname})` : ''}`.trim())
   , [employees])
 
   const [epics,       setEpics]       = useState<Epic[]>([])
@@ -896,7 +902,7 @@ export default function EpicView() {
           ) : tab === 'table' ? (
             <EpicTable
               rows={tableRows} epics={epics} savingIds={savingIds}
-              employees={activeEmployees} testerFlags={testerFlags}
+              employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
               sort={sort} onSort={handleSort} onSave={handleSave} today={today}
               expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
             />
@@ -910,7 +916,7 @@ export default function EpicView() {
           ) : tab === 'deployed' ? (
             <EpicTable
               rows={deployRows} epics={epics} savingIds={savingIds}
-              employees={activeEmployees} testerFlags={testerFlags}
+              employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
               sort={sort} onSort={handleSort} onSave={handleSave} today={today}
               expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
             />
@@ -922,7 +928,7 @@ export default function EpicView() {
               </div>
               <EpicTable
                 rows={delayRows} epics={epics} savingIds={savingIds}
-                employees={activeEmployees} testerFlags={testerFlags}
+                employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
                 sort={sort} onSort={handleSort} onSave={handleSave} today={today}
                 expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
               />
