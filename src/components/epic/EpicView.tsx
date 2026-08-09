@@ -105,6 +105,77 @@ function PortalSelect({ value, options, placeholder, onChange, minWidth = 200 }:
   )
 }
 
+// ─── Multi-select filter dropdown ────────────────────────────────────────────
+
+function MultiSelect({ value, options, placeholder, onChange, minWidth = 160 }: {
+  value: string[]; options: string[]; placeholder: string
+  onChange: (v: string[]) => void; minWidth?: number
+}) {
+  const [open, setOpen]   = useState(false)
+  const [pos, setPos]     = useState({ top: 0, left: 0, width: minWidth })
+  const trigRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  const openMenu = useCallback(() => {
+    if (!trigRef.current) return
+    const r = trigRef.current.getBoundingClientRect()
+    setPos({ top: r.bottom + 2, left: r.left, width: Math.max(r.width, minWidth) })
+    setOpen(true)
+  }, [minWidth])
+
+  useEffect(() => {
+    if (!open) return
+    function h(e: MouseEvent) {
+      const t = e.target as Node
+      if (!trigRef.current?.contains(t) && !menuRef.current?.contains(t)) setOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+
+  function toggle(opt: string) {
+    onChange(value.includes(opt) ? value.filter(v => v !== opt) : [...value, opt])
+  }
+
+  const label = value.length === 0 ? placeholder
+    : value.length === 1 ? value[0]
+    : `${placeholder} (${value.length})`
+
+  return (
+    <>
+      <button ref={trigRef} type="button"
+        onClick={() => open ? setOpen(false) : openMenu()}
+        className={`flex items-center justify-between gap-1.5 px-3 py-1.5 text-sm rounded-lg border bg-white dark:bg-slate-800 focus:outline-none transition-colors ${
+          value.length
+            ? 'border-indigo-400 dark:border-indigo-500 text-indigo-700 dark:text-indigo-300 font-medium'
+            : 'border-gray-200 dark:border-slate-600 text-gray-700 dark:text-slate-200'
+        }`}
+        style={{ minWidth }}
+      >
+        <span className="truncate text-sm">{label}</span>
+        <ChevronDown size={12} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && createPortal(
+        <div ref={menuRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, minWidth: pos.width, zIndex: 9999 }}
+          className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg shadow-xl max-h-60 overflow-y-auto py-1">
+          {options.length === 0 && (
+            <div className="px-3 py-2 text-xs text-gray-400 italic">ไม่มีตัวเลือก</div>
+          )}
+          {options.map(opt => (
+            <label key={opt} className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 select-none">
+              <input type="checkbox" checked={value.includes(opt)} onChange={() => toggle(opt)}
+                className="w-3.5 h-3.5 accent-indigo-600 shrink-0" />
+              <span className="text-xs text-gray-700 dark:text-slate-200 truncate">{opt}</span>
+            </label>
+          ))}
+        </div>,
+        document.body,
+      )}
+    </>
+  )
+}
+
 // ─── TesterFlagCell ───────────────────────────────────────────────────────────
 
 function TesterFlagCell({ selected, masterFlags, onChange }: {
@@ -368,7 +439,7 @@ const COL_DEFS = [
 ] as const
 
 type ColKey = typeof COL_DEFS[number]['key']
-type SortField = 'epicNo' | 'state' | 'targetDate' | 'uatDate' | 'testDate' | 'testEstimateDay' | 'testingPercent' | 'testOwner'
+type SortField = 'epicNo' | 'iteration' | 'project' | 'feature' | 'itemType' | 'state' | 'testOwner' | 'testLead' | 'testEstimateDay' | 'testDate' | 'sitDate' | 'uatDate' | 'targetDate' | 'testingPercent'
 
 const LS_VIS  = 'epic_visible_cols'
 const LS_WIDS = 'epic_col_widths'
@@ -539,16 +610,16 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
             <tr>
               {vis('no')         && <Th colKey="no"         label="#" />}
               {vis('epicNo')     && <Th colKey="epicNo"     label="Epic No"     sortField="epicNo" />}
-              {vis('iteration')  && <Th colKey="iteration"  label="Iteration" />}
-              {vis('project')    && <Th colKey="project"    label="Project" />}
-              {vis('feature')    && <Th colKey="feature"    label="Feature" />}
-              {vis('type')       && <Th colKey="type"       label="Type" />}
+              {vis('iteration')  && <Th colKey="iteration"  label="Iteration"   sortField="iteration" />}
+              {vis('project')    && <Th colKey="project"    label="Project"     sortField="project" />}
+              {vis('feature')    && <Th colKey="feature"    label="Feature"     sortField="feature" />}
+              {vis('type')       && <Th colKey="type"       label="Type"        sortField="itemType" />}
               {vis('state')      && <Th colKey="state"      label="State"       sortField="state" />}
               {vis('testOwner')  && <Th colKey="testOwner"  label="Test Owner"  sortField="testOwner" />}
-              {vis('testLead')   && <Th colKey="testLead"   label="Test Lead" />}
-              {vis('estDay')     && <Th colKey="estDay"     label="Est.(d)"      sortField="testEstimateDay" />}
+              {vis('testLead')   && <Th colKey="testLead"   label="Test Lead"   sortField="testLead" />}
+              {vis('estDay')     && <Th colKey="estDay"     label="Est.(d)"     sortField="testEstimateDay" />}
               {vis('testDate')   && <Th colKey="testDate"   label="Test Date"   sortField="testDate" />}
-              {vis('sitDate')    && <Th colKey="sitDate"    label="SIT Date" />}
+              {vis('sitDate')    && <Th colKey="sitDate"    label="SIT Date"    sortField="sitDate" />}
               {vis('uatDate')    && <Th colKey="uatDate"    label="UAT Date"    sortField="uatDate" />}
               {vis('targetDate') && <Th colKey="targetDate" label="Target Date" sortField="targetDate" />}
               {vis('testingPct') && <Th colKey="testingPct" label="Testing %"   sortField="testingPercent" />}
@@ -652,10 +723,15 @@ export default function EpicView() {
   const [expanded,    setExpanded]    = useState(false)
 
   // Filters
-  const [search,       setSearch]       = useState('')
-  const [filterOwner,  setFilterOwner]  = useState('')
-  const [filterState,  setFilterState]  = useState('')
-  const [filterIter,   setFilterIter]   = useState('')
+  const [search,           setSearch]           = useState('')
+  const [filterOwners,     setFilterOwners]      = useState<string[]>([])
+  const [filterStates,     setFilterStates]      = useState<string[]>([])
+  const [filterTestLeads,  setFilterTestLeads]   = useState<string[]>([])
+  const [filterIter,       setFilterIter]        = useState('')
+  const [filterUatFrom,    setFilterUatFrom]     = useState('')
+  const [filterUatTo,      setFilterUatTo]       = useState('')
+  const [filterTargetFrom, setFilterTargetFrom]  = useState('')
+  const [filterTargetTo,   setFilterTargetTo]    = useState('')
 
   // Sort
   const [sort, setSort] = useState<{ field: SortField; dir: 'asc' | 'desc' }>({ field: 'epicNo', dir: 'asc' })
@@ -782,19 +858,33 @@ export default function EpicView() {
   // ── Filter + tab data ─────────────────────────────────────────────────────────
   function applyFilters(list: Epic[]): Epic[] {
     return list.filter(e => {
-      if (search && !e.feature.toLowerCase().includes(search.toLowerCase()) && !e.project.toLowerCase().includes(search.toLowerCase())) return false
-      if (filterOwner && e.testOwner !== filterOwner) return false
-      if (filterState && e.state !== filterState) return false
-      if (filterIter  && !e.iteration.includes(filterIter)) return false
+      const q = search.toLowerCase()
+      if (q && !e.feature.toLowerCase().includes(q) && !e.project.toLowerCase().includes(q)) return false
+      if (filterOwners.length    && !filterOwners.includes(e.testOwner))  return false
+      if (filterStates.length    && !filterStates.includes(e.state))      return false
+      if (filterTestLeads.length && !filterTestLeads.includes(e.testLead)) return false
+      if (filterIter             && !e.iteration.includes(filterIter))    return false
+      if (filterUatFrom    && (e.uatDate    ?? '') < filterUatFrom)    return false
+      if (filterUatTo      && (e.uatDate    ?? '9999') > filterUatTo)  return false
+      if (filterTargetFrom && (e.targetDate ?? '') < filterTargetFrom) return false
+      if (filterTargetTo   && (e.targetDate ?? '9999') > filterTargetTo) return false
       return true
     })
+  }
+
+  const hasActiveFilter = !!(search || filterOwners.length || filterStates.length || filterTestLeads.length || filterIter || filterUatFrom || filterUatTo || filterTargetFrom || filterTargetTo)
+
+  function clearAllFilters() {
+    setSearch(''); setFilterOwners([]); setFilterStates([]); setFilterTestLeads([])
+    setFilterIter(''); setFilterUatFrom(''); setFilterUatTo(''); setFilterTargetFrom(''); setFilterTargetTo('')
   }
 
   const mainEpics     = useMemo(() => epics.filter(e => !isDeployedEpic(e)), [epics])
   const deployedEpics = useMemo(() => epics.filter(e => isDeployedEpic(e)), [epics])
   const delayEpics    = useMemo(() => mainEpics.filter(e => isDelayPlan(e, todayIso)), [mainEpics, todayIso])
 
-  const tableRows  = useMemo(() => applySort(applyFilters(mainEpics)), [mainEpics, search, filterOwner, filterState, filterIter, sort])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const tableRows  = useMemo(() => applySort(applyFilters(mainEpics)), [mainEpics, search, filterOwners, filterStates, filterTestLeads, filterIter, filterUatFrom, filterUatTo, filterTargetFrom, filterTargetTo, sort])
   const ganttRows  = useMemo(() => mainEpics.map(epicToProject), [mainEpics])
   const deployRows = useMemo(() => applySort(deployedEpics), [deployedEpics, sort])
   const delayRows  = useMemo(() => applySort(delayEpics), [delayEpics, sort])
@@ -863,32 +953,59 @@ export default function EpicView() {
 
         {/* Filters (table tab only) */}
         {tab === 'table' && (
-          <div className="flex flex-wrap gap-2 px-4 py-3 border-b border-gray-100 dark:border-slate-700">
+          <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-slate-700">
+            {/* Search */}
             <input type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="ค้นหา Feature / Project..."
-              className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400 w-56" />
-            <select value={filterOwner} onChange={e => setFilterOwner(e.target.value)}
-              className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none">
-              <option value="">ทุก Test Owner</option>
-              {activeEmployees.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
-            </select>
-            <select value={filterState} onChange={e => setFilterState(e.target.value)}
-              className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none">
-              <option value="">ทุก State</option>
-              {uniqueStates.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+              className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400 w-52" />
+
+            {/* Status multi-select */}
+            <MultiSelect value={filterStates} options={uniqueStates} placeholder="ทุก Status"
+              onChange={setFilterStates} minWidth={130} />
+
+            {/* Test Owner multi-select */}
+            <MultiSelect value={filterOwners} options={activeEmployees.map(e => e.name)} placeholder="ทุก Test Owner"
+              onChange={setFilterOwners} minWidth={148} />
+
+            {/* Test Lead multi-select */}
+            <MultiSelect value={filterTestLeads} options={testLeadOptions} placeholder="ทุก Test Lead"
+              onChange={setFilterTestLeads} minWidth={148} />
+
+            {/* Iteration single select */}
             <select value={filterIter} onChange={e => setFilterIter(e.target.value)}
               className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none">
               <option value="">ทุก Iteration</option>
               {uniqueIters.map(i => <option key={i} value={i}>Sprint {i}</option>)}
             </select>
-            {(search || filterOwner || filterState || filterIter) && (
-              <button onClick={() => { setSearch(''); setFilterOwner(''); setFilterState(''); setFilterIter('') }}
-                className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-200">
+
+            {/* UAT Date range */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-medium text-gray-500 dark:text-slate-400 whitespace-nowrap">UAT:</span>
+              <input type="date" value={filterUatFrom} onChange={e => setFilterUatFrom(e.target.value)}
+                className="px-2 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+              <span className="text-xs text-gray-400">–</span>
+              <input type="date" value={filterUatTo} onChange={e => setFilterUatTo(e.target.value)}
+                className="px-2 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+            </div>
+
+            {/* Target Date range */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-medium text-gray-500 dark:text-slate-400 whitespace-nowrap">Target:</span>
+              <input type="date" value={filterTargetFrom} onChange={e => setFilterTargetFrom(e.target.value)}
+                className="px-2 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+              <span className="text-xs text-gray-400">–</span>
+              <input type="date" value={filterTargetTo} onChange={e => setFilterTargetTo(e.target.value)}
+                className="px-2 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+            </div>
+
+            {/* Clear + count */}
+            {hasActiveFilter && (
+              <button onClick={clearAllFilters}
+                className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors px-2 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
                 <X size={12} /> ล้าง Filter
               </button>
             )}
-            <span className="ml-auto text-xs text-gray-400 dark:text-slate-500 self-center">{tableRows.length} รายการ</span>
+            <span className="ml-auto text-xs text-gray-400 dark:text-slate-500 self-center whitespace-nowrap">{tableRows.length} รายการ</span>
           </div>
         )}
 
