@@ -22,8 +22,8 @@ function fmt(iso: string | null | undefined): string {
 
 function epicToProject(e: Epic): PlanningProject {
   return {
-    id: e.id, iteration: e.iteration, projectName: e.feature,
-    itemType: e.itemType, feature: e.project, tags: '',
+    id: e.id, iteration: stripBuzzebees(e.iteration), projectName: e.feature,
+    itemType: e.itemType, feature: stripBuzzebees(e.project), tags: '',
     status: e.state, testLead: e.testLead, priority: '',
     tester: e.testOwner, goLiveDate: e.targetDate, uatDate: e.uatDate,
     testingPercent: e.testingPercent, testerFlag: e.testerFlag,
@@ -861,8 +861,8 @@ export default function EpicView() {
           <TabBtn active={tab === 'delayplan'} onClick={() => setTab('delayplan')} label="Delay Plan"  count={delayEpics.length} />
         </div>
 
-        {/* Filters (table + gantt tabs) */}
-        {(tab === 'table' || tab === 'gantt') && (
+        {/* Filters (table tab only) */}
+        {tab === 'table' && (
           <div className="flex flex-wrap gap-2 px-4 py-3 border-b border-gray-100 dark:border-slate-700">
             <input type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="ค้นหา Feature / Project..."
