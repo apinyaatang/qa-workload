@@ -248,9 +248,10 @@ function TesterFlagCell({ selected, masterFlags, onChange }: {
 
 // ─── Azure DevOps Config Modal ────────────────────────────────────────────────
 
-function AdoConfigModal({ onSync, onClose }: {
+function AdoConfigModal({ onSync, onClose, initialError }: {
   onSync: (cfg: AzureDevOpsConfig) => void
   onClose: () => void
+  initialError?: string
 }) {
   const saved: AzureDevOpsConfig = (() => {
     try { return JSON.parse(localStorage.getItem(ADO_CONFIG_KEY) ?? '{}') } catch { return {} }
@@ -260,7 +261,7 @@ function AdoConfigModal({ onSync, onClose }: {
   const [pat,      setPat]      = useState(saved.pat       ?? '')
   const [syncing,  setSyncing]  = useState(false)
   const [result,   setResult]   = useState<string | null>(null)
-  const [err,      setErr]      = useState<string | null>(null)
+  const [err,      setErr]      = useState<string | null>(initialError ?? null)
 
   async function handleSync() {
     if (!orgUrl.trim() || !project.trim() || !pat.trim()) {
@@ -725,6 +726,7 @@ export default function EpicView() {
   const [savingIds,   setSavingIds]   = useState<Set<string>>(new Set())
   const [tab,         setTab]         = useState<Tab>('table')
   const [showSync,    setShowSync]    = useState(false)
+  const [syncAuthErr, setSyncAuthErr] = useState<string | undefined>(undefined)
   const [syncing,     setSyncing]     = useState(false)
   const [syncMsg,     setSyncMsg]     = useState<string | null>(null)
   const [expanded,    setExpanded]    = useState(false)
@@ -827,8 +829,8 @@ export default function EpicView() {
   }
 
   // ── Azure DevOps Sync ────────────────────────────────────────────────────────
-  async function handleSync(cfg: AzureDevOpsConfig) {
-    setSyncing(true); setShowSync(false); setSyncMsg(null)
+  async function doSync(cfg: AzureDevOpsConfig) {
+    setSyncing(true); setSyncMsg(null)
     try {
       const result = await syncEpicsFromAdo(cfg, holidaySet)
       const debugPaths = result.samplePaths.length
@@ -842,10 +844,33 @@ export default function EpicView() {
       setSyncMsg(`Sync เสร็จ: เพิ่ม ${result.inserted} แถว, อัปเดต ${result.updated} แถว${filterNote}${result.errors.length ? ` | error ${result.errors.length}: ${result.errors[0]}` : ''}`)
       await load()
     } catch (e: any) {
-      setSyncMsg(`Sync ล้มเหลว: ${e.message}`)
+      const msg: string = e?.message ?? ''
+      if (/401|403|unauthorized/i.test(msg)) {
+        setSyncAuthErr('PAT หมดอายุหรือไม่ถูกต้อง — กรุณาอัปเดต PAT ใหม่')
+        setShowSync(true)
+      } else {
+        setSyncMsg(`Sync ล้มเหลว: ${msg}`)
+      }
     } finally {
       setSyncing(false)
     }
+  }
+
+  function handleSyncClick() {
+    try {
+      const saved: AzureDevOpsConfig = JSON.parse(localStorage.getItem(ADO_CONFIG_KEY) ?? 'null')
+      if (saved?.orgUrl && saved?.project && saved?.pat) {
+        doSync(saved)
+        return
+      }
+    } catch { /* fall through */ }
+    setSyncAuthErr(undefined)
+    setShowSync(true)
+  }
+
+  async function handleSync(cfg: AzureDevOpsConfig) {
+    setShowSync(false); setSyncAuthErr(undefined)
+    await doSync(cfg)
   }
 
   // ── Sort ──────────────────────────────────────────────────────────────────────
@@ -920,7 +945,7 @@ export default function EpicView() {
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-200 text-sm font-medium hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors disabled:opacity-50">
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
           </button>
-          <button onClick={() => setShowSync(true)} disabled={syncing}
+          <button onClick={handleSyncClick} disabled={syncing}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 shadow-sm transition-colors disabled:opacity-60">
             {syncing ? <Loader2 size={14} className="animate-spin" /> : <CloudDownload size={14} />}
             Sync Azure DevOps
@@ -952,10 +977,10 @@ export default function EpicView() {
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
         {/* Tab bar */}
         <div className="flex gap-1 px-4 pt-2 border-b border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700/50 overflow-x-auto">
-          <TabBtn active={tab === 'table'}    onClick={() => setTab('table')}    label="Epic Table"    count={mainEpics.length} />
+          <TabBtn active={tab === 'table'}    onClick={() => setTab('table')}    label="Epic Table"    count={loading ? undefined : mainEpics.length} />
           <TabBtn active={tab === 'gantt'}    onClick={() => setTab('gantt')}    label="Gantt View" />
-          <TabBtn active={tab === 'deployed'} onClick={() => setTab('deployed')} label="Deployed"      count={deployedEpics.length} />
-          <TabBtn active={tab === 'delayplan'} onClick={() => setTab('delayplan')} label="Delay Plan"  count={delayEpics.length} />
+          <TabBtn active={tab === 'deployed'} onClick={() => setTab('deployed')} label="Deployed"      count={loading ? undefined : deployedEpics.length} />
+          <TabBtn active={tab === 'delayplan'} onClick={() => setTab('delayplan')} label="Delay Plan"  count={loading ? undefined : delayEpics.length} />
         </div>
 
         {/* Filters (table tab only) */}
@@ -1065,7 +1090,8 @@ export default function EpicView() {
       {showSync && (
         <AdoConfigModal
           onSync={handleSync}
-          onClose={() => setShowSync(false)}
+          onClose={() => { setShowSync(false); setSyncAuthErr(undefined) }}
+          initialError={syncAuthErr}
         />
       )}
     </div>
