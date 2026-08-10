@@ -48,6 +48,14 @@ function isDelayPlan(e: Epic, todayIso: string): boolean {
 
 // ─── Portal dropdown ──────────────────────────────────────────────────────────
 
+const DROPDOWN_MAX_H = 288 // max-h-72 = 18rem = 288px
+
+function calcDropdownTop(r: DOMRect, maxH: number): number {
+  const spaceBelow = window.innerHeight - r.bottom
+  if (spaceBelow >= maxH || spaceBelow >= r.top) return r.bottom + 2
+  return Math.max(4, r.top - maxH - 2)
+}
+
 function PortalSelect({ value, options, placeholder, onChange, minWidth = 200 }: {
   value: string; options: readonly string[]; placeholder?: string
   onChange: (v: string) => void; minWidth?: number
@@ -60,7 +68,7 @@ function PortalSelect({ value, options, placeholder, onChange, minWidth = 200 }:
   const openMenu = useCallback(() => {
     if (!trigRef.current) return
     const r = trigRef.current.getBoundingClientRect()
-    setPos({ top: r.bottom + 2, left: r.left, width: Math.max(r.width, minWidth) })
+    setPos({ top: calcDropdownTop(r, DROPDOWN_MAX_H), left: r.left, width: Math.max(r.width, minWidth) })
     setOpen(true)
   }, [minWidth])
 
@@ -122,7 +130,7 @@ function MultiSelect({ value, options, placeholder, onChange, minWidth = 160 }: 
   const openMenu = useCallback(() => {
     if (!trigRef.current) return
     const r = trigRef.current.getBoundingClientRect()
-    setPos({ top: r.bottom + 2, left: r.left, width: Math.max(r.width, minWidth) })
+    setPos({ top: calcDropdownTop(r, DROPDOWN_MAX_H), left: r.left, width: Math.max(r.width, minWidth) })
     setOpen(true)
   }, [minWidth])
 
