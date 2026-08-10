@@ -36,13 +36,14 @@ function epicToProject(e: Epic): PlanningProject {
   }
 }
 
+const DEPLOYED_STATES = new Set(['Deployed', 'Go-live Commercial'])
+
 function isDeployedEpic(e: Epic): boolean {
-  return e.testerFlag.some(f => f.toLowerCase() === 'deployed')
+  return DEPLOYED_STATES.has(e.state)
 }
 function isDelayPlan(e: Epic, todayIso: string): boolean {
   if (isDeployedEpic(e)) return false
-  const ref = e.targetDate ?? e.uatDate
-  return !!ref && ref < todayIso
+  return !!e.testDate && e.testDate >= todayIso && (e.testingPercent ?? 0) < 1
 }
 
 // ─── Portal dropdown ──────────────────────────────────────────────────────────
@@ -1047,7 +1048,7 @@ export default function EpicView() {
             <div>
               <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 text-amber-700 dark:text-amber-300 text-xs">
                 <AlertTriangle size={13} />
-                Epic ที่ Target Date / UAT Date เลยกำหนดแล้ว และยังไม่ Deployed
+                Epic ที่ Testing Date &gt;= วันนี้ และ Testing% &lt; 1%
               </div>
               <EpicTable
                 rows={delayRows} epics={epics} savingIds={savingIds}
