@@ -74,6 +74,12 @@ interface Props {
 
 function isoToDate(iso: string): Date { return new Date(iso) }
 
+function fmtDate(iso: string | null): string {
+  if (!iso) return '—'
+  const [, m, d] = iso.split('-')
+  return `${d}/${m}`
+}
+
 /** Snap a date backward to the nearest working day (skip weekends & holidays) */
 function snapWorkday(iso: string, holidays: Set<string>): string {
   let ms = Date.UTC(
@@ -331,8 +337,10 @@ export default function TesterGanttView({ projects, holidays, employees = [], ex
               </div>
 
               {/* Task rows */}
-              {group.rows.map(({ project: p }) => {
-                const isExtra = extraIds?.has(p.id) ?? false
+              {group.rows.map(({ project: p, bars }) => {
+                const isExtra   = extraIds?.has(p.id) ?? false
+                const noBars    = bars.length === 0
+                const showDates = noBars && (p.uatDate || p.goLiveDate)
                 return (
                 <div
                   key={p.id}
@@ -354,8 +362,22 @@ export default function TesterGanttView({ projects, holidays, employees = [], ex
                     <p className={`text-xs font-medium truncate leading-tight ${isExtra ? 'text-violet-800 dark:text-violet-200' : 'text-gray-800 dark:text-slate-100'}`}>
                       {p.projectName}
                     </p>
-                    {p.feature && (
+                    {p.feature && !showDates && (
                       <p className="text-[10px] text-gray-400 dark:text-slate-500 truncate leading-tight">{p.feature}</p>
+                    )}
+                    {showDates && (
+                      <p className="text-[10px] truncate leading-tight flex gap-1.5">
+                        {p.uatDate && (
+                          <span className="text-orange-500 dark:text-orange-400 font-medium">
+                            UAT: {fmtDate(p.uatDate)}
+                          </span>
+                        )}
+                        {p.goLiveDate && p.goLiveDate !== p.uatDate && (
+                          <span className="text-red-500 dark:text-red-400 font-medium">
+                            Target: {fmtDate(p.goLiveDate)}
+                          </span>
+                        )}
+                      </p>
                     )}
                   </div>
                   {/* Testing % mini bar */}
@@ -477,6 +499,22 @@ export default function TesterGanttView({ projects, holidays, employees = [], ex
                         style={{ left: ci * COL_W, width: COL_W }}
                       />
                     ))}
+
+                    {/* No-bar fallback: show UAT / Go Live date badges in timeline */}
+                    {bars.length === 0 && (p.uatDate || p.goLiveDate) && (
+                      <div className="absolute inset-0 flex items-center gap-2 px-3 z-10 pointer-events-none">
+                        {p.uatDate && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-300 border border-orange-200 dark:border-orange-700 whitespace-nowrap">
+                            🏳 UAT: {fmtDate(p.uatDate)}
+                          </span>
+                        )}
+                        {p.goLiveDate && p.goLiveDate !== p.uatDate && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300 border border-red-200 dark:border-red-700 whitespace-nowrap">
+                            🚀 Go Live: {fmtDate(p.goLiveDate)}
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Bars */}
                     {bars.map((bar, bi) => {
