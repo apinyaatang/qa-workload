@@ -4,8 +4,25 @@ import { Plus, Trash2, Loader2, AlertCircle, X, RefreshCw, ChevronDown, Save } f
 import { useApp } from '../../context/AppContext'
 import { extraTaskDb } from '../../lib/extraTaskDb'
 import { planningDb } from '../../lib/planningDb'
-import { ALL_STATUSES } from '../planning/PlanningView'
 import { EXTRA_TASK_TYPES } from '../../types/extraTask'
+
+const ALL_STATUSES = [
+  'Cancel : Cancel from customer',
+  'Control : Handover to App Support Team',
+  'Define : Kick off with customer',
+  'Define : On Business Requirement',
+  'Go Live : Commercial Go live',
+  'Go Live : PROD Go live',
+  'Implement : Hold / Wait for Customer Feedback',
+  'Implement : On Development',
+  'Implement : On SIT/UAT with Customer',
+  'Implement : On Testing',
+  'Implement : UAT Sign off',
+  'Implement : Wait for Deployment',
+  'Planning : Internal Kick off project with team',
+  'Planning : Wait for development',
+  'Transition : Monitoring After Go live',
+]
 import type { ExtraTask, ExtraTaskType } from '../../types/extraTask'
 
 // ── Portal dropdown ────────────────────────────────────────────────────────────
