@@ -91,6 +91,18 @@ function getIterationNumber(path: string): number {
   return match ? parseInt(match[1], 10) : 0
 }
 
+// ADO returns dates as UTC ISO strings (e.g. "2026-08-19T17:00:00Z" = midnight Bangkok time).
+// Parse with local timezone so the date reflects the user's local calendar day.
+function adoDateToIso(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const d = new Date(raw)
+  if (isNaN(d.getTime())) return null
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 const ADO_FIELDS = [
   'System.Id',
   'System.Title',
@@ -177,9 +189,9 @@ export async function syncEpicsFromAdo(
   for (const item of filtered) {
     const f = item.fields ?? {}
     const epicNo: number = f['System.Id']
-    const uatDate    = f['Custom.UATDate']    ? f['Custom.UATDate'].slice(0, 10)                                    : null
-    const targetDate = f['Microsoft.VSTS.Scheduling.TargetDate'] ? f['Microsoft.VSTS.Scheduling.TargetDate'].slice(0, 10) : null
-    const sitDate    = f['Custom.SITDate']    ? f['Custom.SITDate'].slice(0, 10)                                   : null
+    const uatDate    = adoDateToIso(f['Custom.UATDate'])
+    const targetDate = adoDateToIso(f['Microsoft.VSTS.Scheduling.TargetDate'])
+    const sitDate    = adoDateToIso(f['Custom.SITDate'])
 
     const existing = existingMap.get(epicNo)
     const estDay   = existing?.test_estimate_day ?? null
