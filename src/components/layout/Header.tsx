@@ -10,12 +10,11 @@ const viewTitles: Record<string, string> = {
   individual:         'รายงานรายบุคคล',
   settings:           'Master Data Settings',
   import:             'Import File',
-  planning:           'QA Workload',
   'my-projects':      'โปรเจคของฉัน',
   'project-progress': 'Project Progress',
 }
 
-const hideActions = new Set(['settings', 'import', 'planning', 'my-projects', 'project-progress'])
+const hideActions = new Set(['settings', 'import', 'my-projects', 'project-progress'])
 
 export default function Header() {
   const { activeView, isDarkMode, toggleDarkMode } = useApp()

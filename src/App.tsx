@@ -10,7 +10,6 @@ import AdhocReport from './components/adhoc/AdhocReport'
 import IndividualReport from './components/individual/IndividualReport'
 import SettingsView from './components/settings/SettingsView'
 import ImportView from './components/import/ImportView'
-import PlanningView from './components/planning/PlanningView'
 import ExtraTaskView from './components/extratask/ExtraTaskView'
 import EpicView from './components/epic/EpicView'
 import MyProjectsView from './components/myprojects/MyProjectsView'
@@ -30,7 +29,6 @@ function AppContent() {
       case 'individual':       return <IndividualReport />
       case 'settings':         return <SettingsView />
       case 'import':           return <ImportView />
-      case 'planning':         return <PlanningView />
       case 'extra-tasks':      return <ExtraTaskView />
       case 'epics':            return <EpicView />
       case 'my-projects':      return <MyProjectsView />

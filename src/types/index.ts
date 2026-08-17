@@ -117,7 +117,7 @@ export interface AppState {
 
 export type ViewType =
   | 'dashboard' | 'employees' | 'tasks' | 'adhoc-report'
-  | 'individual' | 'settings' | 'import' | 'planning'
+  | 'individual' | 'settings' | 'import'
   | 'my-projects'
   | 'project-progress'
   | 'extra-tasks'

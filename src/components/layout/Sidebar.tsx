@@ -1,4 +1,4 @@
-import { Users, BarChart2, Settings, TestTube2, LayoutDashboard, FolderKanban, ListPlus, Layers } from 'lucide-react'
+import { Users, BarChart2, Settings, LayoutDashboard, FolderKanban, ListPlus, Layers } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import type { ViewType } from '../../types'
 
@@ -9,7 +9,6 @@ const navGroups: NavGroup[] = [
   {
     items: [
       { view: 'my-projects', label: 'โปรเจคของฉัน',     icon: <FolderKanban size={17} /> },
-      { view: 'planning',     label: 'QA Workload',        icon: <TestTube2 size={17} /> },
       { view: 'extra-tasks', label: 'Extra Task',         icon: <ListPlus size={17} /> },
       { view: 'epics',       label: 'Epic (ADO)',          icon: <Layers size={17} /> },
       { view: 'dashboard',   label: 'Team Dashboard',     icon: <LayoutDashboard size={17} /> },

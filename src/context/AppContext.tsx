@@ -39,9 +39,6 @@ interface AppContextType extends AppState {
   applyImportSession: (sessionId: string) => void
   deleteImportSession: (id: string) => void
   resetToDefaults: () => void
-  // Cross-page navigation signal: set before navigating to 'planning'
-  planningInitialTester: string | null
-  setPlanningInitialTester: (t: string | null) => void
   // Dark mode
   isDarkMode: boolean
   toggleDarkMode: () => void
@@ -67,7 +64,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isLoading,               setIsLoading]               = useState(isConfigured)
   const [dbError,                 setDbError]                 = useState<string | null>(null)
   const [isOnline,                setIsOnline]                = useState(isConfigured)
-  const [planningInitialTester,   setPlanningInitialTester]   = useState<string | null>(null)
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() =>
     localStorage.getItem('wiq:theme') === 'dark'
   )
@@ -312,7 +308,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addPublicHoliday, removePublicHoliday,
       addImportSession, applyImportSession, deleteImportSession,
       resetToDefaults,
-      planningInitialTester, setPlanningInitialTester,
       isDarkMode, toggleDarkMode,
     }}>
       {children}
