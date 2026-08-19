@@ -999,30 +999,6 @@ export default function EpicView() {
 
   return (
     <div className="flex flex-col gap-4 p-4 min-h-screen bg-gray-50 dark:bg-slate-900">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Epic (Azure DevOps)</h1>
-          <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{epics.length} Epics (IterationPath &gt; 230)</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {savingIds.size > 0 && (
-            <span className="flex items-center gap-1 text-xs text-blue-500">
-              <Loader2 size={12} className="animate-spin" /> กำลังบันทึก...
-            </span>
-          )}
-          <button onClick={load} disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-200 text-sm font-medium hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors disabled:opacity-50">
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
-          </button>
-          <button onClick={handleSyncClick} disabled={syncing}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 shadow-sm transition-colors disabled:opacity-60">
-            {syncing ? <Loader2 size={14} className="animate-spin" /> : <CloudDownload size={14} />}
-            Sync Azure DevOps
-          </button>
-        </div>
-      </div>
-
       {/* Conflict / Sync messages */}
       {conflictMsg && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 text-sm">
@@ -1046,11 +1022,28 @@ export default function EpicView() {
       {/* Tabs */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
         {/* Tab bar */}
-        <div className="flex gap-1 px-4 pt-2 border-b border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700/50 overflow-x-auto">
+        <div className="flex items-end gap-1 px-4 pt-2 border-b border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700/50">
           <TabBtn active={tab === 'table'}    onClick={() => setTab('table')}    label="Epic Table"    count={loading ? undefined : mainEpics.length} />
           <TabBtn active={tab === 'gantt'}    onClick={() => setTab('gantt')}    label="Gantt View" />
           <TabBtn active={tab === 'deployed'} onClick={() => setTab('deployed')} label="Deployed"      count={loading ? undefined : deployedEpics.length} />
           <TabBtn active={tab === 'delayplan'} onClick={() => setTab('delayplan')} label="Delay Plan"  count={loading ? undefined : delayEpics.length} />
+          <div className="flex-1" />
+          <div className="flex items-center gap-2 pb-2">
+            {savingIds.size > 0 && (
+              <span className="flex items-center gap-1 text-xs text-blue-500">
+                <Loader2 size={12} className="animate-spin" /> บันทึก...
+              </span>
+            )}
+            <button onClick={load} disabled={loading}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-200 dark:bg-slate-600 text-gray-700 dark:text-slate-200 text-xs font-medium hover:bg-gray-300 dark:hover:bg-slate-500 transition-colors disabled:opacity-50">
+              <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> Refresh
+            </button>
+            <button onClick={handleSyncClick} disabled={syncing}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-60">
+              {syncing ? <Loader2 size={12} className="animate-spin" /> : <CloudDownload size={12} />}
+              Sync ADO
+            </button>
+          </div>
         </div>
 
         {/* Filters (table tab only) */}

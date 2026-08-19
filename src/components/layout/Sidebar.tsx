@@ -1,4 +1,4 @@
-import { Users, BarChart2, Settings, LayoutDashboard, FolderKanban, ListPlus, Layers } from 'lucide-react'
+import { Users, BarChart2, Settings, LayoutDashboard, FolderKanban, ListPlus, Layers, Sun, Moon } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import type { ViewType } from '../../types'
 
@@ -24,7 +24,7 @@ const navGroups: NavGroup[] = [
 ]
 
 export default function Sidebar() {
-  const { activeView, setActiveView } = useApp()
+  const { activeView, setActiveView, isDarkMode, toggleDarkMode } = useApp()
 
   return (
     <aside className="w-60 min-h-screen bg-white dark:bg-slate-800 border-r border-gray-100 dark:border-slate-700 flex flex-col shadow-sm">
@@ -73,8 +73,15 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="p-3 border-t border-gray-100 dark:border-slate-700">
-        <p className="text-xs text-gray-400 dark:text-slate-500 text-center">Employee Workload System</p>
+      <div className="p-3 border-t border-gray-100 dark:border-slate-700 flex items-center justify-between">
+        <p className="text-xs text-gray-400 dark:text-slate-500">Employee Workload System</p>
+        <button
+          onClick={toggleDarkMode}
+          title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          className="p-1.5 rounded-lg border border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+        >
+          {isDarkMode ? <Sun size={14} /> : <Moon size={14} />}
+        </button>
       </div>
     </aside>
   )
