@@ -204,7 +204,7 @@ function TesterFlagCell({ selected, masterFlags, onChange }: {
   const openMenu = useCallback(() => {
     if (!trigRef.current) return
     const r = trigRef.current.getBoundingClientRect()
-    setPos({ top: r.bottom + 2, left: r.left, width: Math.max(r.width, 200) })
+    setPos({ top: calcDropdownTop(r, DROPDOWN_MAX_H), left: r.left, width: Math.max(r.width, 200) })
     setOpen(true)
   }, [])
 
