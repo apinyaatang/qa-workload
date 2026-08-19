@@ -50,10 +50,15 @@ function isDelayPlan(e: Epic, todayIso: string): boolean {
 
 const DROPDOWN_MAX_H = 288 // max-h-72 = 18rem = 288px
 
-function calcDropdownTop(r: DOMRect, maxH: number): number {
+interface DropdownPos { top?: number; bottom?: number; left: number; width: number }
+
+function calcDropdownPos(r: DOMRect, maxH: number, minWidth: number): DropdownPos {
   const spaceBelow = window.innerHeight - r.bottom
-  if (spaceBelow >= maxH || spaceBelow >= r.top) return r.bottom + 2
-  return Math.max(4, r.top - maxH - 2)
+  const left = r.left
+  const width = Math.max(r.width, minWidth)
+  if (spaceBelow >= maxH || spaceBelow >= r.top) return { top: r.bottom + 2, left, width }
+  // flip up: anchor bottom of dropdown to top of trigger so it sits right above
+  return { bottom: window.innerHeight - r.top + 2, left, width }
 }
 
 function PortalSelect({ value, options, placeholder, onChange, minWidth = 200 }: {
@@ -61,14 +66,14 @@ function PortalSelect({ value, options, placeholder, onChange, minWidth = 200 }:
   onChange: (v: string) => void; minWidth?: number
 }) {
   const [open, setOpen]   = useState(false)
-  const [pos, setPos]     = useState({ top: 0, left: 0, width: minWidth })
+  const [pos, setPos]     = useState<DropdownPos>({ top: 0, left: 0, width: minWidth })
   const trigRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
   const openMenu = useCallback(() => {
     if (!trigRef.current) return
     const r = trigRef.current.getBoundingClientRect()
-    setPos({ top: calcDropdownTop(r, DROPDOWN_MAX_H), left: r.left, width: Math.max(r.width, minWidth) })
+    setPos(calcDropdownPos(r, DROPDOWN_MAX_H, minWidth))
     setOpen(true)
   }, [minWidth])
 
@@ -95,7 +100,7 @@ function PortalSelect({ value, options, placeholder, onChange, minWidth = 200 }:
       </button>
       {open && createPortal(
         <div ref={menuRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, minWidth: pos.width, zIndex: 9999 }}
+          style={{ position: 'fixed', top: pos.top, bottom: pos.bottom, left: pos.left, minWidth: pos.width, zIndex: 9999 }}
           className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg shadow-xl max-h-72 overflow-y-auto">
           {placeholder && (
             <div onMouseDown={() => { onChange(''); setOpen(false) }}
@@ -123,14 +128,14 @@ function MultiSelect({ value, options, placeholder, onChange, minWidth = 160 }: 
   onChange: (v: string[]) => void; minWidth?: number
 }) {
   const [open, setOpen]   = useState(false)
-  const [pos, setPos]     = useState({ top: 0, left: 0, width: minWidth })
+  const [pos, setPos]     = useState<DropdownPos>({ top: 0, left: 0, width: minWidth })
   const trigRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
   const openMenu = useCallback(() => {
     if (!trigRef.current) return
     const r = trigRef.current.getBoundingClientRect()
-    setPos({ top: calcDropdownTop(r, DROPDOWN_MAX_H), left: r.left, width: Math.max(r.width, minWidth) })
+    setPos(calcDropdownPos(r, DROPDOWN_MAX_H, minWidth))
     setOpen(true)
   }, [minWidth])
 
@@ -170,7 +175,7 @@ function MultiSelect({ value, options, placeholder, onChange, minWidth = 160 }: 
       </button>
       {open && createPortal(
         <div ref={menuRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, minWidth: pos.width, zIndex: 9999 }}
+          style={{ position: 'fixed', top: pos.top, bottom: pos.bottom, left: pos.left, minWidth: pos.width, zIndex: 9999 }}
           className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg shadow-xl max-h-60 overflow-y-auto py-1">
           {options.length === 0 && (
             <div className="px-3 py-2 text-xs text-gray-400 italic">ไม่มีตัวเลือก</div>
@@ -197,14 +202,14 @@ function TesterFlagCell({ selected, masterFlags, onChange }: {
   selected: string[]; masterFlags: string[]; onChange: (v: string[]) => void
 }) {
   const [open, setOpen] = useState(false)
-  const [pos, setPos]   = useState({ top: 0, left: 0, width: 200 })
+  const [pos, setPos]   = useState<DropdownPos>({ top: 0, left: 0, width: 200 })
   const trigRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
   const openMenu = useCallback(() => {
     if (!trigRef.current) return
     const r = trigRef.current.getBoundingClientRect()
-    setPos({ top: calcDropdownTop(r, DROPDOWN_MAX_H), left: r.left, width: Math.max(r.width, 200) })
+    setPos(calcDropdownPos(r, DROPDOWN_MAX_H, 200))
     setOpen(true)
   }, [])
 
@@ -232,7 +237,7 @@ function TesterFlagCell({ selected, masterFlags, onChange }: {
       </div>
       {open && createPortal(
         <div ref={menuRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, minWidth: pos.width, zIndex: 9999 }}
+          style={{ position: 'fixed', top: pos.top, bottom: pos.bottom, left: pos.left, minWidth: pos.width, zIndex: 9999 }}
           className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg shadow-xl max-h-64 overflow-y-auto">
           {masterFlags.map(flag => (
             <label key={flag} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer">
