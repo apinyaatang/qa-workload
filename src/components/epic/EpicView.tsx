@@ -538,6 +538,14 @@ function initColWidths(): Record<string, number> {
   return defaults
 }
 
+function adoItemUrl(epicNo: number): string | null {
+  try {
+    const cfg: AzureDevOpsConfig = JSON.parse(localStorage.getItem(ADO_CONFIG_KEY) ?? 'null')
+    if (!cfg?.orgUrl || !cfg?.project) return null
+    return `${cfg.orgUrl.replace(/\/$/, '')}/${encodeURIComponent(cfg.project)}/_workitems/edit/${epicNo}`
+  } catch { return null }
+}
+
 // ─── EpicTable ────────────────────────────────────────────────────────────────
 
 interface TableProps {
@@ -924,14 +932,6 @@ export default function EpicView() {
     } finally {
       setSyncing(false)
     }
-  }
-
-  function adoItemUrl(epicNo: number): string | null {
-    try {
-      const cfg: AzureDevOpsConfig = JSON.parse(localStorage.getItem(ADO_CONFIG_KEY) ?? 'null')
-      if (!cfg?.orgUrl || !cfg?.project) return null
-      return `${cfg.orgUrl.replace(/\/$/, '')}/${encodeURIComponent(cfg.project)}/_workitems/edit/${epicNo}`
-    } catch { return null }
   }
 
   function handleSyncClick() {
