@@ -717,7 +717,7 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
               return (
                 <tr key={epic.id} className={`${rowBg} hover:bg-blue-50/30 dark:hover:bg-slate-700/40 transition-colors`}>
                   {vis('no')         && <td className={`${tdBase} text-center text-gray-400 text-[11px]`}>{idx + 1}</td>}
-                  {vis('epicNo')     && <td className={`${tdBase} font-mono text-blue-700 dark:text-blue-300`}>{epic.epicNo}</td>}
+                  {vis('epicNo')     && <td className={`${tdBase} font-mono`}>{(() => { const url = adoItemUrl(epic.epicNo); return url ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{epic.epicNo}</a> : <span className="text-blue-700 dark:text-blue-300">{epic.epicNo}</span> })()}</td>}
                   {vis('iteration')  && <td className={tdBase}><span className="block truncate text-xs" title={epic.iteration}>{stripBuzzebees(epic.iteration) || '—'}</span></td>}
                   {vis('project')    && <td className={tdBase}><span className="block truncate text-xs" title={epic.project}>{stripBuzzebees(epic.project) || '—'}</span></td>}
                   {vis('feature')    && <td className={tdBase}><span className="block truncate font-medium text-xs" title={epic.feature}>{epic.feature || '—'}</span></td>}
@@ -924,6 +924,14 @@ export default function EpicView() {
     } finally {
       setSyncing(false)
     }
+  }
+
+  function adoItemUrl(epicNo: number): string | null {
+    try {
+      const cfg: AzureDevOpsConfig = JSON.parse(localStorage.getItem(ADO_CONFIG_KEY) ?? 'null')
+      if (!cfg?.orgUrl || !cfg?.project) return null
+      return `${cfg.orgUrl.replace(/\/$/, '')}/${encodeURIComponent(cfg.project)}/_workitems/edit/${epicNo}`
+    } catch { return null }
   }
 
   function handleSyncClick() {
