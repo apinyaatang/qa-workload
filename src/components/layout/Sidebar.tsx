@@ -1,5 +1,7 @@
-import { Users, BarChart2, Settings, LayoutDashboard, FolderKanban, ListPlus, Layers, Sun, Moon } from 'lucide-react'
+import { Users, BarChart2, Settings, LayoutDashboard, FolderKanban, ListPlus, Layers, Sun, Moon, LogOut, ShieldCheck } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
+import { useAuth } from '../../context/AuthContext'
+import { canView } from '../../lib/permissions'
 import type { ViewType } from '../../types'
 
 type NavItem = { view: ViewType; label: string; icon: React.ReactNode }
@@ -25,6 +27,14 @@ const navGroups: NavGroup[] = [
 
 export default function Sidebar() {
   const { activeView, setActiveView, isDarkMode, toggleDarkMode } = useApp()
+  const { state, role, signOut } = useAuth()
+
+  // ซ่อนเมนูที่ role นี้เข้าไม่ได้ — แต่การกั้นจริงอยู่ที่ switch ใน App.tsx
+  const visibleGroups = navGroups
+    .map(g => ({ ...g, items: g.items.filter(i => canView(role, i.view)) }))
+    .filter(g => g.items.length > 0)
+
+  const profile = state.status === 'authenticated' ? state.profile : null
 
   return (
     <aside className="w-60 min-h-screen bg-white dark:bg-slate-800 border-r border-gray-100 dark:border-slate-700 flex flex-col shadow-sm">
@@ -50,7 +60,7 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
-        {navGroups.map((group, gi) => (
+        {visibleGroups.map((group, gi) => (
           <div key={gi}>
             {group.groupLabel && (
               <p className="text-[10px] font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider px-3 mb-1">
@@ -80,8 +90,28 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="p-3 border-t border-gray-100 dark:border-slate-700">
-        <p className="text-xs text-gray-400 dark:text-slate-500 text-center">Employee Workload System</p>
+      <div className="p-3 border-t border-gray-100 dark:border-slate-700 space-y-2">
+        {profile ? (
+          <>
+            <div className="px-2">
+              <p className="text-xs font-semibold text-gray-700 dark:text-slate-200 truncate">
+                {profile.fullName || profile.email}
+              </p>
+              <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-medium text-indigo-600 dark:text-indigo-400">
+                <ShieldCheck size={10} />
+                {profile.role === 'admin' ? 'Admin' : 'Staff'}
+              </span>
+            </div>
+            <button
+              onClick={signOut}
+              className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs font-medium text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-gray-800 dark:hover:text-slate-100 transition-colors"
+            >
+              <LogOut size={13} /> ออกจากระบบ
+            </button>
+          </>
+        ) : (
+          <p className="text-xs text-gray-400 dark:text-slate-500 text-center">Employee Workload System</p>
+        )}
       </div>
     </aside>
   )

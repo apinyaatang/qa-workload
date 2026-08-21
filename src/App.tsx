@@ -1,5 +1,7 @@
-import { AuthProvider } from './context/AuthContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import { AppProvider, useApp } from './context/AppContext'
+import AuthGate from './components/auth/AuthGate'
+import { canView } from './lib/permissions'
 import Sidebar from './components/layout/Sidebar'
 import Header from './components/layout/Header'
 import DbStatusBar from './components/layout/DbStatusBar'
@@ -14,13 +16,18 @@ import ExtraTaskView from './components/extratask/ExtraTaskView'
 import EpicView from './components/epic/EpicView'
 import MyProjectsView from './components/myprojects/MyProjectsView'
 import ProjectProgressView from './components/progress/ProjectProgressView'
-import { Loader2 } from 'lucide-react'
+import { Loader2, ShieldOff } from 'lucide-react'
 import './index.css'
 
 function AppContent() {
   const { activeView, isLoading, isDarkMode, selectedProjectId } = useApp()
+  const { role } = useAuth()
 
   function renderView() {
+    // กั้นที่ switch ด้วย ไม่ใช่แค่ซ่อนเมนูใน Sidebar
+    // เพราะการซ่อนปุ่มไม่ได้หยุดคนที่เปิด devtools เรียก setActiveView() เอง
+    if (!canView(role, activeView)) return <NoAccess />
+
     switch (activeView) {
       case 'dashboard':        return <TeamDashboard />
       case 'employees':        return <EmployeesView />
@@ -60,12 +67,30 @@ function AppContent() {
   )
 }
 
+function NoAccess() {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
+      <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-slate-800 flex items-center justify-center">
+        <ShieldOff size={22} className="text-gray-400 dark:text-slate-500" />
+      </div>
+      <p className="text-sm font-semibold text-gray-700 dark:text-slate-200">
+        คุณไม่มีสิทธิ์เข้าถึงหน้านี้
+      </p>
+      <p className="text-xs text-gray-400 dark:text-slate-500">
+        หากต้องการสิทธิ์เพิ่ม กรุณาติดต่อ Admin
+      </p>
+    </div>
+  )
+}
+
 export default function App() {
   return (
     <AuthProvider>
-      <AppProvider>
-        <AppContent />
-      </AppProvider>
+      <AuthGate>
+        <AppProvider>
+          <AppContent />
+        </AppProvider>
+      </AuthGate>
     </AuthProvider>
   )
 }
