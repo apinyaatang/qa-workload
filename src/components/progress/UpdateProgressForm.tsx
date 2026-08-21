@@ -3,6 +3,8 @@ import { Send, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { planningDb } from '../../lib/planningDb'
 import { progressDb } from '../../lib/progressDb'
 import { sendProgressToTeams } from '../../lib/teamsService'
+import { useAuth } from '../../context/AuthContext'
+import { attributionFor } from '../../lib/auth/identity'
 import type { PlanningProject } from '../../types/planning'
 import type { ADOStatusSummary } from '../../lib/adoService'
 import ProgressHistory from './ProgressHistory'
@@ -22,6 +24,9 @@ function getProgressColor(pct: number): string {
 }
 
 export default function UpdateProgressForm({ project, adoSummary = [] }: Props) {
+  const { state } = useAuth()
+  const me = attributionFor(state)
+
   const [pct, setPct] = useState(project.testingPercent ?? 0)
   const [comment, setComment] = useState('')
   const [sendTeams, setSendTeams] = useState(false)
@@ -67,23 +72,32 @@ export default function UpdateProgressForm({ project, adoSummary = [] }: Props) 
           uatDate:        project.uatDate,
           goLiveDate:     project.goLiveDate,
           adoSummary:     adoSummary,
-          updatedBy:      'System',
+          // ชื่อคนจริงแทนคำว่า 'System' ที่ hardcode ไว้เดิม
+          updatedBy:      me.staffName,
           updatedAt:      new Date().toLocaleString('th-TH'),
         })
         sentToTeams = true
       }
 
-      await progressDb.insert({
-        planningId:     project.id,
-        staffId:        'offline',
-        testingPercent: pct,
-        comment:        comment.trim(),
-        adoSnapshot,
-        sentToTeams,
-        teamsSentAt:    sentToTeams ? now : undefined,
-      })
+      // บันทึกประวัติได้เฉพาะเมื่อมี user id จริง — policy บังคับ staff_id = auth.uid()
+      // ถ้ายังไม่เปิด login ก็ข้ามไป แต่ต้องบอกผู้ใช้ตรงๆ ไม่ใช่เงียบ
+      if (me.canRecord) {
+        await progressDb.insert({
+          planningId:     project.id,
+          staffId:        me.staffId,
+          staffName:      me.staffName,
+          testingPercent: pct,
+          comment:        comment.trim(),
+          adoSnapshot,
+          sentToTeams,
+          teamsSentAt:    sentToTeams ? now : undefined,
+        })
+      }
 
-      setToast({ type: 'success', message: `บันทึกสำเร็จ${sentToTeams ? ' · ส่งแจ้งเตือน Teams แล้ว' : ''}` })
+      const parts = [me.canRecord ? 'บันทึกสำเร็จ' : `บันทึก ${pct}% แล้ว`]
+      if (sentToTeams)    parts.push('ส่งแจ้งเตือน Teams แล้ว')
+      if (!me.canRecord)  parts.push('ยังไม่บันทึกประวัติ เพราะยังไม่เปิดระบบ login')
+      setToast({ type: 'success', message: parts.join(' · ') })
       setComment('')
       setSendTeams(false)
       setHistoryKey(k => k + 1)

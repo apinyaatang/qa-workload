@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { History, Loader2, Send } from 'lucide-react'
+import { History, Loader2, Send, User, AlertCircle } from 'lucide-react'
 import { progressDb, type ProgressUpdate } from '../../lib/progressDb'
 
 interface Props {
@@ -15,18 +15,33 @@ function formatDateTime(iso: string | undefined): string {
 export default function ProgressHistory({ planningId }: Props) {
   const [history, setHistory] = useState<ProgressUpdate[]>([])
   const [loading, setLoading] = useState(true)
+  const [error,   setError]   = useState<string | null>(null)
 
   useEffect(() => {
-    progressDb.getByPlanningId(planningId).then(data => {
-      setHistory(data)
-      setLoading(false)
-    })
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+
+    progressDb.getByPlanningId(planningId)
+      .then(data => { if (!cancelled) setHistory(data) })
+      // เดิมไม่มี .catch() — เมื่อ query ล้ม (ตารางไม่มี หรือ RLS ปฏิเสธ)
+      // setLoading(false) จะไม่ถูกเรียก แล้วหน้าค้างที่ spinner ตลอดไป
+      // แทนที่จะบอกผู้ใช้ว่าเกิดอะไรขึ้น
+      .catch(() => { if (!cancelled) setError('โหลดประวัติไม่สำเร็จ') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+
+    return () => { cancelled = true }
   }, [planningId])
 
   if (loading) return (
     <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-slate-500 py-4">
       <Loader2 size={13} className="animate-spin" /> กำลังโหลดประวัติ...
     </div>
+  )
+  if (error) return (
+    <p className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 py-4">
+      <AlertCircle size={13} /> {error}
+    </p>
   )
   if (history.length === 0) return (
     <p className="text-xs text-gray-400 dark:text-slate-500 py-4">ยังไม่มีประวัติการอัพเดท</p>
@@ -51,9 +66,20 @@ export default function ProgressHistory({ planningId }: Props) {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-gray-500 dark:text-slate-400">{formatDateTime(h.createdAt)}</span>
+              <div className="flex items-center gap-2 min-w-0">
+                {/* ชื่อคนบันทึกจริง — เดิมประวัติไม่บอกว่าใครเป็นคนอัพเดท */}
+                {h.staffName && (
+                  <span className="flex items-center gap-1 text-xs font-medium text-gray-700 dark:text-slate-200 truncate">
+                    <User size={11} className="shrink-0 text-gray-400 dark:text-slate-500" />
+                    {h.staffName}
+                  </span>
+                )}
+                <span className="text-xs text-gray-500 dark:text-slate-400 shrink-0">
+                  {formatDateTime(h.createdAt)}
+                </span>
+              </div>
               {h.sentToTeams && (
-                <span className="flex items-center gap-0.5 text-[10px] text-indigo-500 dark:text-indigo-400">
+                <span className="flex items-center gap-0.5 text-[10px] text-indigo-500 dark:text-indigo-400 shrink-0">
                   <Send size={10} /> Teams
                 </span>
               )}
