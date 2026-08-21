@@ -124,6 +124,31 @@ policy ที่มีอยู่ทุกตัวเขียนว่า `FO
 
 ---
 
+### Phase 3 — ผูก user id จริงกับการส่ง progress (ผลกระทบ: การส่ง progress)
+
+โค้ดเสร็จแล้ว ทำงานได้ทั้งตอน auth เปิดและปิด
+
+```
+15. deploy โค้ดก่อน  ← สำคัญ ห้ามสลับลำดับ
+16. supabase/migrations/05_progress_identity.sql
+       ขั้นที่ 1 ต้องได้ orphan_staff_id = 0 ก่อนไปต่อ
+```
+
+**ทำไมต้อง deploy โค้ดก่อน SQL:** policy `progress_updates: own insert` (สร้างใน `03`)
+บังคับ `staff_id = auth.uid()` อยู่แล้ว ถ้ารัน SQL ก่อนโดยที่โค้ดยังส่ง `'offline'`
+การส่ง progress จะล้มทุกครั้ง โค้ดใหม่ข้ามการเขียนเมื่อไม่มี user id จริง
+จึงไม่มีช่วงที่ผู้ใช้เจอ error
+
+พฤติกรรมตามสถานะ:
+
+| สถานะ | `%` บันทึก | ประวัติบันทึก | ชื่อใน Teams card |
+|---|---|---|---|
+| auth ปิด (วันนี้) | ✅ | ❌ + บอกใน toast | `ไม่ระบุผู้บันทึก…` |
+| ล็อกอินแล้ว | ✅ | ✅ | ชื่อจริงจาก profile |
+| บัญชีถูกปิดใช้งาน | ✅ | ❌ | `ไม่ระบุผู้บันทึก…` |
+
+---
+
 ### 🚨 ถ้าพลาด
 
 ```
@@ -140,7 +165,7 @@ policy ที่มีอยู่ทุกตัวเขียนว่า `FO
 | Phase | งาน | ต้องทำหลัง |
 |---|---|---|
 | **2** | ปุ่ม "Reset to defaults" ใน Master Data ยังไม่ผูกกับ `reset:demo-data` — มันยัดข้อมูล employee **ปลอม** กลับเข้า state แล้วการแก้ครั้งถัดไปจะ upsert ลงตารางจริง | 1 |
-| **3** | `UpdateProgressForm` ยัง hardcode `staffId: 'offline'` และ `updatedBy: 'System'` ลงคอลัมน์ที่อ้าง `auth.users(id)` — ต้องเปลี่ยนเป็น user id จริง **ก่อน** ใส่ policy ที่บังคับ `auth.uid() = staff_id` | 1 |
+| ~~**3**~~ | ✅ **เสร็จแล้ว** — ดูหัวข้อ "Phase 3" ข้างล่าง | 1 |
 | **4** | "โปรเจคของฉัน" ยังแสดงโปรเจคของ**ทุกคน** — ต้องผูกตัวตนผ่าน `staff_assignments` + หน้าจัดการ user (ต้องมี Edge Function `admin-users` ที่ถือ `service_role`) | 1, 3 |
 | **5** | **ปิด RLS ให้จริง** — 4 ขั้น ห้ามรวมเป็น migration เดียว: รัดกุม `authenticated` ทีละตารางต่อ deploy → ลด `anon` เหลือแค่อ่าน → ลบ policy `anon` → **ถอน grant ที่อยู่ข้างใต้** (การลบ policy ไม่ถอน grant) | 0, 1, 3, 4 |
 | **6** | ย้าย ADO PAT และ Teams webhook ไปฝั่ง server — เริ่มที่ Teams ก่อน เพราะไม่มีเรื่อง CORS | อิสระ |
