@@ -6,6 +6,8 @@ import {
 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { epicDb, syncEpicsFromAdo, calcEpicTestDate } from '../../lib/epicDb'
+import { dateTone, toneClass } from '../../utils/epicDateTone'
+import { subtractWorkingDaysH } from '../../utils/workingDayUtils'
 import TesterGanttView from '../planning/TesterGanttView'
 import type { Epic, AzureDevOpsConfig } from '../../types/epic'
 import type { PlanningProject } from '../../types/planning'
@@ -37,6 +39,40 @@ function epicToProject(e: Epic): PlanningProject {
 }
 
 const DEPLOYED_STATES = new Set(['Deployed', 'Go-live Commercial'])
+
+/**
+ * Status ที่แสดงในแท็บ Epic Table
+ *
+ * เป็น whitelist ไม่ใช่ blacklist — Status ที่ไม่อยู่ในลิสต์นี้ (Closed, Removed,
+ * On Hold ฯลฯ) จะไม่ถูกแสดง ส่วนแท็บ Deployed และ Delay Plan ไม่ได้รับผลกระทบ
+ *
+ * เทียบแบบไม่สนตัวพิมพ์เล็ก-ใหญ่และช่องว่างหัวท้าย เพราะค่าที่ ADO ส่งมาสะกด
+ * ไม่ตรงกันเป๊ะเสมอไป — ถ้าเทียบตรงๆ แถวจะหายไปเงียบๆ โดยไม่มีอะไรบอก
+ */
+const TABLE_STATES = new Set([
+  'active',
+  'development',
+  'new',
+  'requirement gathering',
+  // "Test UAT" ที่ระบุมาไม่มีอยู่จริงใน ADO — ข้อมูลจริงมี 'Test' และ 'UAT'
+  // แยกเป็นคนละ state จึงใส่ทั้งคู่
+  'test',
+  'uat',
+  'wait for deploy',
+])
+
+// State ทั้งหมดที่มีในข้อมูลจริง ณ 31 ส.ค. 2026:
+//   ในลิสต์นี้ : Active · Development · New · Requirement Gathering · Test · UAT · Wait for deploy
+//   ไปแท็บอื่น : Deployed · Go-live Commercial  (→ แท็บ Deployed)
+//   ถูกตัดออก  : On hold · Retired
+
+function normalizeState(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function isTableEpic(e: Epic): boolean {
+  return TABLE_STATES.has(normalizeState(e.state ?? ''))
+}
 
 function isDeployedEpic(e: Epic): boolean {
   return DEPLOYED_STATES.has(e.state)
@@ -559,11 +595,13 @@ interface TableProps {
   onSort: (f: SortField) => void
   onSave: (id: string, patch: Partial<Epic>) => void
   today: Date
+  /** ขอบล่างของโซนเหลือง = วันนี้ - 3 วันทำการ (YYYY-MM-DD) */
+  warnFromIso: string
   expanded: boolean
   onToggleExpand: () => void
 }
 
-function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, sort, onSort, onSave, today, expanded, onToggleExpand }: TableProps) {
+function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, sort, onSort, onSave, today, warnFromIso, expanded, onToggleExpand }: TableProps) {
   const todayIso = today.toISOString().slice(0, 10)
   const empNames = employees.map(e => e.name)
 
@@ -720,7 +758,8 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
             {rows.map((epic, idx) => {
               const isSaving   = savingIds.has(epic.id)
               const isDelay    = isDelayPlan(epic, todayIso)
-              const targetNear = !!epic.targetDate && epic.targetDate >= todayIso && epic.targetDate <= new Date(today.getTime() + 7 * 86400000).toISOString().slice(0, 10)
+              // เดิมมี targetNear (Target ภายใน 7 วัน → ส้ม) ถูกแทนที่ด้วยเกณฑ์สี
+              // ชุดใหม่ใน dateTone() ที่ครอบทั้ง Test / UAT / Target พร้อมกัน
               const rowBg      = isSaving ? 'bg-blue-50/40 dark:bg-blue-900/10' : isDelay ? 'bg-amber-50/30 dark:bg-amber-900/10' : 'bg-white dark:bg-slate-800'
               return (
                 <tr key={epic.id} className={`${rowBg} hover:bg-blue-50/30 dark:hover:bg-slate-700/40 transition-colors`}>
@@ -742,10 +781,11 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
                     </td>
                   )}
                   {vis('estDay')     && <td className={`${tdBase} text-center`}><InlineNumber id={epic.id} value={epic.testEstimateDay} field="testEstimateDay" unit="d" min={0} onSave={onSave} /></td>}
-                  {vis('testDate')   && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${!!epic.testDate && epic.testDate < todayIso ? 'text-red-600 font-semibold' : ''}`}>{fmt(epic.testDate)}</span></td>}
+                  {/* Test / UAT / Target ใช้เกณฑ์สีเดียวกัน — SIT ไม่อยู่ในเกณฑ์ */}
+                  {vis('testDate')   && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(dateTone(epic.testDate, todayIso, warnFromIso))}`}>{fmt(epic.testDate)}</span></td>}
                   {vis('sitDate')    && <td className={`${tdBase} whitespace-nowrap text-xs`}>{fmt(epic.sitDate)}</td>}
-                  {vis('uatDate')    && <td className={`${tdBase} whitespace-nowrap text-xs`}>{fmt(epic.uatDate)}</td>}
-                  {vis('targetDate') && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${targetNear ? 'font-bold text-orange-600' : ''}`}>{fmt(epic.targetDate)}</span></td>}
+                  {vis('uatDate')    && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(dateTone(epic.uatDate, todayIso, warnFromIso))}`}>{fmt(epic.uatDate)}</span></td>}
+                  {vis('targetDate') && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(dateTone(epic.targetDate, todayIso, warnFromIso))}`}>{fmt(epic.targetDate)}</span></td>}
                   {vis('testingPct') && (
                     <td className={tdBase}>
                       {epic.testingPercent != null && (
@@ -827,6 +867,12 @@ export default function EpicView() {
   useEffect(() => { epicsRef.current = epics }, [epics])
   const today = useMemo(() => new Date(), [])
   const todayIso = today.toISOString().slice(0, 10)
+
+  // ขอบล่างของโซนเหลือง = วันนี้ - 3 วันทำการ (ข้ามเสาร์-อาทิตย์และวันหยุด)
+  const warnFromIso = useMemo(
+    () => subtractWorkingDaysH(today, 3, holidaySet).toISOString().slice(0, 10),
+    [today, holidaySet],
+  )
 
   // ── Load ──────────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -993,8 +1039,12 @@ export default function EpicView() {
   const deployedEpics = useMemo(() => epics.filter(e => isDeployedEpic(e)), [epics])
   const delayEpics    = useMemo(() => mainEpics.filter(e => isDelayPlan(e, todayIso)), [mainEpics, todayIso])
 
+  // แท็บ Epic Table กรอง Status เพิ่มอีกชั้น — แยกจาก mainEpics โดยเจตนา
+  // เพราะ Gantt View และ Delay Plan ยังต้องเห็น Epic ทุกสถานะที่ยังไม่ deploy
+  const tableEpics = useMemo(() => mainEpics.filter(isTableEpic), [mainEpics])
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const tableRows  = useMemo(() => applySort(applyFilters(mainEpics)), [mainEpics, search, filterOwners, filterStates, filterTestLeads, filterIter, filterUatFrom, filterUatTo, filterTargetFrom, filterTargetTo, sort])
+  const tableRows  = useMemo(() => applySort(applyFilters(tableEpics)), [tableEpics, search, filterOwners, filterStates, filterTestLeads, filterIter, filterUatFrom, filterUatTo, filterTargetFrom, filterTargetTo, sort])
   const ganttRows  = useMemo(() => mainEpics.map(epicToProject), [mainEpics])
   const deployRows = useMemo(() => applySort(deployedEpics), [deployedEpics, sort])
   const delayRows  = useMemo(() => applySort(delayEpics), [delayEpics, sort])
@@ -1031,7 +1081,7 @@ export default function EpicView() {
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
         {/* Tab bar */}
         <div className="flex items-end gap-1 px-4 pt-2 border-b border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700/50">
-          <TabBtn active={tab === 'table'}    onClick={() => setTab('table')}    label="Epic Table"    count={loading ? undefined : mainEpics.length} />
+          <TabBtn active={tab === 'table'}    onClick={() => setTab('table')}    label="Epic Table"    count={loading ? undefined : tableEpics.length} />
           <TabBtn active={tab === 'gantt'}    onClick={() => setTab('gantt')}    label="Gantt View" />
           <TabBtn active={tab === 'deployed'} onClick={() => setTab('deployed')} label="Deployed"      count={loading ? undefined : deployedEpics.length} />
           <TabBtn active={tab === 'delayplan'} onClick={() => setTab('delayplan')} label="Delay Plan"  count={loading ? undefined : delayEpics.length} />
@@ -1123,7 +1173,7 @@ export default function EpicView() {
             <EpicTable
               rows={tableRows} epics={epics} savingIds={savingIds}
               employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
-              sort={sort} onSort={handleSort} onSave={handleSave} today={today}
+              sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnFromIso={warnFromIso}
               expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
             />
           ) : tab === 'gantt' ? (
@@ -1137,7 +1187,7 @@ export default function EpicView() {
             <EpicTable
               rows={deployRows} epics={epics} savingIds={savingIds}
               employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
-              sort={sort} onSort={handleSort} onSave={handleSave} today={today}
+              sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnFromIso={warnFromIso}
               expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
             />
           ) : tab === 'delayplan' ? (
@@ -1149,7 +1199,7 @@ export default function EpicView() {
               <EpicTable
                 rows={delayRows} epics={epics} savingIds={savingIds}
                 employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
-                sort={sort} onSort={handleSort} onSave={handleSave} today={today}
+                sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnFromIso={warnFromIso}
                 expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
               />
             </div>
