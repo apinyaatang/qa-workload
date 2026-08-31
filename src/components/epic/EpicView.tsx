@@ -6,8 +6,8 @@ import {
 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { epicDb, syncEpicsFromAdo, calcEpicTestDate } from '../../lib/epicDb'
-import { dateTone, toneClass } from '../../utils/epicDateTone'
-import { subtractWorkingDaysH } from '../../utils/workingDayUtils'
+import { dateTone, toneClass, localIsoDate, utcDateFromIso } from '../../utils/epicDateTone'
+import { addWorkingDaysH } from '../../utils/workingDayUtils'
 import TesterGanttView from '../planning/TesterGanttView'
 import type { Epic, AzureDevOpsConfig } from '../../types/epic'
 import type { PlanningProject } from '../../types/planning'
@@ -596,13 +596,13 @@ interface TableProps {
   onSave: (id: string, patch: Partial<Epic>) => void
   today: Date
   /** ขอบล่างของโซนเหลือง = วันนี้ - 3 วันทำการ (YYYY-MM-DD) */
-  warnFromIso: string
+  warnUntilIso: string
   expanded: boolean
   onToggleExpand: () => void
 }
 
-function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, sort, onSort, onSave, today, warnFromIso, expanded, onToggleExpand }: TableProps) {
-  const todayIso = today.toISOString().slice(0, 10)
+function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, sort, onSort, onSave, today, warnUntilIso, expanded, onToggleExpand }: TableProps) {
+  const todayIso = localIsoDate(today)
   const empNames = employees.map(e => e.name)
 
   const [visibleCols, setVisibleCols] = useState<Set<ColKey>>(initVisibleCols)
@@ -782,10 +782,10 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
                   )}
                   {vis('estDay')     && <td className={`${tdBase} text-center`}><InlineNumber id={epic.id} value={epic.testEstimateDay} field="testEstimateDay" unit="d" min={0} onSave={onSave} /></td>}
                   {/* Test / UAT / Target ใช้เกณฑ์สีเดียวกัน — SIT ไม่อยู่ในเกณฑ์ */}
-                  {vis('testDate')   && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(dateTone(epic.testDate, todayIso, warnFromIso))}`}>{fmt(epic.testDate)}</span></td>}
+                  {vis('testDate')   && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(dateTone(epic.testDate, todayIso, warnUntilIso))}`}>{fmt(epic.testDate)}</span></td>}
                   {vis('sitDate')    && <td className={`${tdBase} whitespace-nowrap text-xs`}>{fmt(epic.sitDate)}</td>}
-                  {vis('uatDate')    && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(dateTone(epic.uatDate, todayIso, warnFromIso))}`}>{fmt(epic.uatDate)}</span></td>}
-                  {vis('targetDate') && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(dateTone(epic.targetDate, todayIso, warnFromIso))}`}>{fmt(epic.targetDate)}</span></td>}
+                  {vis('uatDate')    && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(dateTone(epic.uatDate, todayIso, warnUntilIso))}`}>{fmt(epic.uatDate)}</span></td>}
+                  {vis('targetDate') && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(dateTone(epic.targetDate, todayIso, warnUntilIso))}`}>{fmt(epic.targetDate)}</span></td>}
                   {vis('testingPct') && (
                     <td className={tdBase}>
                       {epic.testingPercent != null && (
@@ -866,12 +866,16 @@ export default function EpicView() {
   const epicsRef = useRef<Epic[]>([])
   useEffect(() => { epicsRef.current = epics }, [epics])
   const today = useMemo(() => new Date(), [])
-  const todayIso = today.toISOString().slice(0, 10)
+  // ใช้วันที่ตามเวลาท้องถิ่น ไม่ใช่ toISOString() ซึ่งให้วันตาม UTC
+  // ที่ไทย (UTC+7) ช่วงเที่ยงคืนถึง 07:00 UTC ยังเป็นเมื่อวานอยู่
+  const todayIso = useMemo(() => localIsoDate(today), [today])
 
-  // ขอบล่างของโซนเหลือง = วันนี้ - 3 วันทำการ (ข้ามเสาร์-อาทิตย์และวันหยุด)
-  const warnFromIso = useMemo(
-    () => subtractWorkingDaysH(today, 3, holidaySet).toISOString().slice(0, 10),
-    [today, holidaySet],
+  // ขอบบนของโซนเหลือง = วันนี้ + 3 วันทำการ (ข้ามเสาร์-อาทิตย์และวันหยุด)
+  // ต้องแปลงเป็น Date ที่เที่ยงคืน UTC ก่อน เพราะ workingDayUtils คิดด้วย UTC
+  // addWorkingDaysH คืน Date ที่เที่ยงคืน UTC จึงอ่านกลับด้วย toISOString ไม่ใช่ local
+  const warnUntilIso = useMemo(
+    () => addWorkingDaysH(utcDateFromIso(todayIso), 3, holidaySet).toISOString().slice(0, 10),
+    [todayIso, holidaySet],
   )
 
   // ── Load ──────────────────────────────────────────────────────────────────────
@@ -1173,7 +1177,7 @@ export default function EpicView() {
             <EpicTable
               rows={tableRows} epics={epics} savingIds={savingIds}
               employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
-              sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnFromIso={warnFromIso}
+              sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
               expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
             />
           ) : tab === 'gantt' ? (
@@ -1187,7 +1191,7 @@ export default function EpicView() {
             <EpicTable
               rows={deployRows} epics={epics} savingIds={savingIds}
               employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
-              sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnFromIso={warnFromIso}
+              sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
               expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
             />
           ) : tab === 'delayplan' ? (
@@ -1199,7 +1203,7 @@ export default function EpicView() {
               <EpicTable
                 rows={delayRows} epics={epics} savingIds={savingIds}
                 employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
-                sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnFromIso={warnFromIso}
+                sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
                 expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
               />
             </div>

@@ -2,35 +2,58 @@
 //
 // ใช้กับ Test date / UAT Date / Target Date (ไม่รวม SIT Date)
 //
-// เกณฑ์ที่ตกลงไว้ — เรียงตามลำดับความสำคัญ ตรวจจากเฉพาะเจาะจงที่สุดก่อน:
+// เกณฑ์ — เรียงตามลำดับความสำคัญ ตรวจจากเฉพาะเจาะจงที่สุดก่อน:
 //
-//   วันที่ = วันนี้                       → ส้ม
-//   วันที่ > วันนี้                       → แดง   (ยังมาไม่ถึง)
-//   วันที่ >= วันนี้ - 3 วันทำการ (และ < วันนี้) → เหลือง (เพิ่งผ่านมา)
-//   เก่ากว่านั้น                          → ปกติ
+//   วันที่ = วันนี้                        → ส้ม     (ครบกำหนดวันนี้)
+//   วันที่ < วันนี้                        → แดง     (เลยกำหนดแล้ว)
+//   วันที่ <= วันนี้ + 3 วันทำการ           → เหลือง  (ใกล้ครบกำหนด)
+//   ไกลกว่านั้น                            → ปกติ
 //
-// ⚠️ สังเกตว่า "อนาคต = แดง" ซึ่งกลับทางกับ traffic light ทั่วไป
-//    เป็นเกณฑ์ที่ยืนยันมาแล้ว ไม่ใช่ความผิดพลาด — อย่าไป "แก้" ให้เป็นแบบเดิม
-//    ความหมายคือ งานที่ยังมาไม่ถึงกำหนดคือสิ่งที่ต้องจับตา ส่วนที่ผ่านไปแล้วจางลง
+// ความเร่งด่วนไล่จาก แดง > ส้ม > เหลือง > ปกติ
+// วันที่ในอนาคตไกลคือเรื่องปกติ ไม่ต้องเน้นสี
 //
 // การนับ 3 วันทำการข้ามเสาร์-อาทิตย์และวันหยุดตาม master data
 
 export type DateTone = 'red' | 'orange' | 'yellow' | null
 
 /**
- * @param iso        วันที่ของแถว (YYYY-MM-DD) — null/'' ได้
- * @param todayIso   วันนี้ (YYYY-MM-DD)
- * @param warnFromIso ขอบเขตล่างของโซนเหลือง = วันนี้ - 3 วันทำการ (YYYY-MM-DD)
+ * วันที่ของ "วันนี้" ตามเวลาท้องถิ่น เป็น YYYY-MM-DD
+ *
+ * ห้ามใช้ new Date().toISOString().slice(0,10) แทน — มันให้วันที่ตาม UTC
+ * ที่ไทย (UTC+7) ช่วงเที่ยงคืนถึง 07:00 จะได้วันของเมื่อวาน
+ * ทำให้ทั้งตารางเทียบวันผิดไป 1 วันในช่วงเวลานั้น
+ */
+export function localIsoDate(d: Date = new Date()): string {
+  const y  = d.getFullYear()
+  const m  = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${dd}`
+}
+
+/**
+ * แปลง YYYY-MM-DD เป็น Date ที่ตรงเที่ยงคืน UTC
+ *
+ * workingDayUtils คำนวณด้วย UTC ทั้งหมด (getUTCDay / Date.UTC) การส่ง Date
+ * ที่สร้างจากเวลาท้องถิ่นเข้าไปตรงๆ จะทำให้มันมองเป็นวันก่อนหน้า
+ */
+export function utcDateFromIso(iso: string): Date {
+  return new Date(`${iso}T00:00:00Z`)
+}
+
+/**
+ * @param iso          วันที่ของแถว (YYYY-MM-DD) — null/'' ได้
+ * @param todayIso     วันนี้ (YYYY-MM-DD)
+ * @param warnUntilIso ขอบบนของโซนเหลือง = วันนี้ + 3 วันทำการ (YYYY-MM-DD)
  */
 export function dateTone(
   iso: string | null | undefined,
   todayIso: string,
-  warnFromIso: string,
+  warnUntilIso: string,
 ): DateTone {
   if (!iso) return null
-  if (iso === todayIso) return 'orange'
-  if (iso > todayIso)   return 'red'
-  if (iso >= warnFromIso) return 'yellow'
+  if (iso === todayIso)    return 'orange'
+  if (iso < todayIso)      return 'red'
+  if (iso <= warnUntilIso) return 'yellow'
   return null
 }
 

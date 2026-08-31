@@ -1,43 +1,53 @@
 import { describe, it, expect } from 'vitest'
-import { dateTone, toneClass } from './epicDateTone'
-import { subtractWorkingDaysH } from './workingDayUtils'
+import { dateTone, toneClass, localIsoDate, utcDateFromIso } from './epicDateTone'
+import { addWorkingDaysH } from './workingDayUtils'
 
-// วันนี้สมมติ = ศุกร์ 21 ส.ค. 2026
-const TODAY = '2026-08-21'
-// ย้อน 3 วันทำการจากศุกร์ → อังคาร 18 ส.ค. (ข้ามเสาร์-อาทิตย์ไม่มีในช่วงนี้)
-const WARN_FROM = '2026-08-18'
+// วันนี้สมมติ = จันทร์ 31 ส.ค. 2026
+const TODAY = '2026-08-31'
+// ไปข้างหน้า 3 วันทำการ → พฤหัส 3 ก.ย.
+const WARN_UNTIL = '2026-09-03'
 
 describe('สีของวันที่ในตาราง Epic', () => {
   it('วันนี้ → ส้ม', () => {
-    expect(dateTone(TODAY, TODAY, WARN_FROM)).toBe('orange')
+    expect(dateTone(TODAY, TODAY, WARN_UNTIL)).toBe('orange')
   })
 
-  it('อนาคต → แดง (กลับทางกับ traffic light ทั่วไปโดยเจตนา)', () => {
-    expect(dateTone('2026-08-22', TODAY, WARN_FROM)).toBe('red')
-    expect(dateTone('2026-09-15', TODAY, WARN_FROM)).toBe('red')
-    expect(dateTone('2027-01-01', TODAY, WARN_FROM)).toBe('red')
+  it('เลยกำหนดแล้ว → แดง', () => {
+    expect(dateTone('2026-08-30', TODAY, WARN_UNTIL)).toBe('red')
+    expect(dateTone('2026-08-20', TODAY, WARN_UNTIL)).toBe('red')
+    expect(dateTone('2026-01-28', TODAY, WARN_UNTIL)).toBe('red')
   })
 
-  it('เพิ่งผ่านมาไม่เกิน 3 วันทำการ → เหลือง', () => {
-    expect(dateTone('2026-08-20', TODAY, WARN_FROM)).toBe('yellow')
-    expect(dateTone('2026-08-19', TODAY, WARN_FROM)).toBe('yellow')
-    expect(dateTone(WARN_FROM,    TODAY, WARN_FROM)).toBe('yellow')   // ขอบพอดี = รวมด้วย
+  it('ใกล้ครบกำหนดไม่เกิน 3 วันทำการ → เหลือง', () => {
+    expect(dateTone('2026-09-01', TODAY, WARN_UNTIL)).toBe('yellow')
+    expect(dateTone('2026-09-02', TODAY, WARN_UNTIL)).toBe('yellow')
+    expect(dateTone(WARN_UNTIL,   TODAY, WARN_UNTIL)).toBe('yellow')   // ขอบพอดี = รวมด้วย
   })
 
-  it('เก่ากว่า 3 วันทำการ → ปกติ', () => {
-    expect(dateTone('2026-08-17', TODAY, WARN_FROM)).toBeNull()
-    expect(dateTone('2026-02-05', TODAY, WARN_FROM)).toBeNull()
+  it('อนาคตไกล → ปกติ ไม่ใช่แดง', () => {
+    // เคสที่เคยผิด: วันที่ยังมาไม่ถึงถูกทำเป็นแดงทั้งหมด
+    expect(dateTone('2026-09-04', TODAY, WARN_UNTIL)).toBeNull()
+    expect(dateTone('2026-09-20', TODAY, WARN_UNTIL)).toBeNull()
+    expect(dateTone('2026-09-22', TODAY, WARN_UNTIL)).toBeNull()
+    expect(dateTone('2026-10-01', TODAY, WARN_UNTIL)).toBeNull()
+    expect(dateTone('2027-12-31', TODAY, WARN_UNTIL)).toBeNull()
   })
 
   it('ไม่มีวันที่ → ปกติ ไม่ throw', () => {
-    expect(dateTone(null,      TODAY, WARN_FROM)).toBeNull()
-    expect(dateTone(undefined, TODAY, WARN_FROM)).toBeNull()
-    expect(dateTone('',        TODAY, WARN_FROM)).toBeNull()
+    expect(dateTone(null,      TODAY, WARN_UNTIL)).toBeNull()
+    expect(dateTone(undefined, TODAY, WARN_UNTIL)).toBeNull()
+    expect(dateTone('',        TODAY, WARN_UNTIL)).toBeNull()
   })
 
-  it('ลำดับความสำคัญ: วันนี้ชนะ "อนาคต" และชนะ "เพิ่งผ่านมา" เสมอ', () => {
-    // ถ้าเรียงเงื่อนไขผิด วันนี้จะตกไปเป็นเหลือง เพราะ today >= warnFrom ก็จริง
+  it('ลำดับความสำคัญ: วันนี้ชนะทั้งแดงและเหลืองเสมอ', () => {
+    // ถ้าเรียงเงื่อนไขผิด วันนี้จะตกไปเป็นเหลือง เพราะ today <= warnUntil ก็จริง
     expect(dateTone(TODAY, TODAY, TODAY)).toBe('orange')
+  })
+
+  it('ความเร่งด่วนไล่จาก แดง(อดีต) > ส้ม(วันนี้) > เหลือง(ใกล้) > ปกติ(ไกล)', () => {
+    const seq = ['2026-08-28', TODAY, '2026-09-02', '2026-10-01']
+    expect(seq.map(d => dateTone(d, TODAY, WARN_UNTIL)))
+      .toEqual(['red', 'orange', 'yellow', null])
   })
 
   it('ทุกสีมี class ของตัวเอง และไม่มีสีไหนได้ class ว่าง', () => {
@@ -54,20 +64,42 @@ describe('สีของวันที่ในตาราง Epic', () => {
   })
 })
 
-describe('การนับ 3 วันทำการย้อนหลัง', () => {
+describe('การนับ 3 วันทำการไปข้างหน้า', () => {
   const noHolidays = new Set<string>()
-  const iso = (d: Date) => d.toISOString().slice(0, 10)
+  // workingDayUtils คิดด้วย UTC ทั้งหมด — เข้า UTC ออก UTC
+  const warnUntil = (fromIso: string, holidays = noHolidays) =>
+    addWorkingDaysH(utcDateFromIso(fromIso), 3, holidays).toISOString().slice(0, 10)
 
-  it('จากวันจันทร์ ย้อน 3 วันทำการ ต้องข้ามเสาร์-อาทิตย์', () => {
-    // จันทร์ 24 ส.ค. 2026 → ศุกร์ 21, พฤหัส 20, พุธ 19
-    const monday = new Date('2026-08-24T00:00:00')
-    expect(iso(subtractWorkingDaysH(monday, 3, noHolidays))).toBe('2026-08-19')
+  it('จากจันทร์ 31 ส.ค. ไป 3 วันทำการ = พฤหัส 3 ก.ย.', () => {
+    expect(warnUntil('2026-08-31')).toBe(WARN_UNTIL)
+  })
+
+  it('จากศุกร์ ต้องข้ามเสาร์-อาทิตย์', () => {
+    // ศุกร์ 28 ส.ค. → จันทร์ 31, อังคาร 1, พุธ 2
+    expect(warnUntil('2026-08-28')).toBe('2026-09-02')
   })
 
   it('วันหยุดนักขัตฤกษ์ถูกข้ามด้วย', () => {
-    const monday = new Date('2026-08-24T00:00:00')
-    // ทำให้ศุกร์ 21 เป็นวันหยุด → ต้องเลื่อนไปอังคาร 18
-    const holidays = new Set(['2026-08-21'])
-    expect(iso(subtractWorkingDaysH(monday, 3, holidays))).toBe('2026-08-18')
+    // อังคาร 1 ก.ย. เป็นวันหยุด → จันทร์ 31 นับ อังคาร(ข้าม) พุธ พฤหัส ศุกร์
+    expect(warnUntil('2026-08-31', new Set(['2026-09-01']))).toBe('2026-09-04')
+  })
+})
+
+describe('วันที่ตามเวลาท้องถิ่น (บั๊ก timezone)', () => {
+  it('localIsoDate ให้วันตามเครื่อง ไม่ใช่ตาม UTC', () => {
+    // 30 ส.ค. 17:30 UTC = 31 ส.ค. 00:30 ที่ไทย (UTC+7)
+    // toISOString จะให้ 2026-08-30 ซึ่งผิดไป 1 วันสำหรับผู้ใช้ในไทย
+    const d = new Date(2026, 7, 31, 0, 30, 0)   // สร้างด้วยเวลาท้องถิ่นเสมอ
+    expect(localIsoDate(d)).toBe('2026-08-31')
+  })
+
+  it('utcDateFromIso ให้เที่ยงคืน UTC พอดี', () => {
+    expect(utcDateFromIso('2026-08-31').toISOString()).toBe('2026-08-31T00:00:00.000Z')
+  })
+
+  it('ไป-กลับแล้วได้วันเดิม', () => {
+    for (const iso of ['2026-01-01', '2026-08-31', '2026-12-31']) {
+      expect(utcDateFromIso(iso).toISOString().slice(0, 10)).toBe(iso)
+    }
   })
 })
