@@ -1043,13 +1043,15 @@ export default function EpicView() {
   const deployedEpics = useMemo(() => epics.filter(e => isDeployedEpic(e)), [epics])
   const delayEpics    = useMemo(() => mainEpics.filter(e => isDelayPlan(e, todayIso)), [mainEpics, todayIso])
 
-  // แท็บ Epic Table กรอง Status เพิ่มอีกชั้น — แยกจาก mainEpics โดยเจตนา
-  // เพราะ Gantt View และ Delay Plan ยังต้องเห็น Epic ทุกสถานะที่ยังไม่ deploy
+  // แท็บ Epic Table และ Gantt View ใช้ชุดข้อมูลเดียวกัน — กรอง Status เพิ่มอีกชั้น
+  // Delay Plan ยังใช้ mainEpics เพราะต้องเห็น Epic ทุกสถานะที่ยังไม่ deploy
   const tableEpics = useMemo(() => mainEpics.filter(isTableEpic), [mainEpics])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const tableRows  = useMemo(() => applySort(applyFilters(tableEpics)), [tableEpics, search, filterOwners, filterStates, filterTestLeads, filterIter, filterUatFrom, filterUatTo, filterTargetFrom, filterTargetTo, sort])
-  const ganttRows  = useMemo(() => mainEpics.map(epicToProject), [mainEpics])
+  // Gantt ต่อยอดจาก tableRows ตรงๆ เพื่อการันตีว่าเห็นชุดเดียวกับตารางเสมอ
+  // ถ้าแยกไปกรองเองซ้ำ สองแท็บจะเพี้ยนจากกันทันทีที่มีคนเพิ่ม filter ใหม่
+  const ganttRows  = useMemo(() => tableRows.map(epicToProject), [tableRows])
   const deployRows = useMemo(() => applySort(deployedEpics), [deployedEpics, sort])
   const delayRows  = useMemo(() => applySort(delayEpics), [delayEpics, sort])
 
@@ -1086,7 +1088,7 @@ export default function EpicView() {
         {/* Tab bar */}
         <div className="flex items-end gap-1 px-4 pt-2 border-b border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700/50">
           <TabBtn active={tab === 'table'}    onClick={() => setTab('table')}    label="Epic Table"    count={loading ? undefined : tableEpics.length} />
-          <TabBtn active={tab === 'gantt'}    onClick={() => setTab('gantt')}    label="Gantt View" />
+          <TabBtn active={tab === 'gantt'}    onClick={() => setTab('gantt')}    label="Gantt View"    count={loading ? undefined : tableEpics.length} />
           <TabBtn active={tab === 'deployed'} onClick={() => setTab('deployed')} label="Deployed"      count={loading ? undefined : deployedEpics.length} />
           <TabBtn active={tab === 'delayplan'} onClick={() => setTab('delayplan')} label="Delay Plan"  count={loading ? undefined : delayEpics.length} />
           <div className="flex-1" />
@@ -1108,8 +1110,8 @@ export default function EpicView() {
           </div>
         </div>
 
-        {/* Filters (table tab only) */}
-        {tab === 'table' && (
+        {/* Filters — ใช้ร่วมกันระหว่าง Epic Table กับ Gantt View */}
+        {(tab === 'table' || tab === 'gantt') && (
           <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-slate-700">
             {/* Search */}
             <input type="text" value={search} onChange={e => setSearch(e.target.value)}
