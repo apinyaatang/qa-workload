@@ -7,10 +7,10 @@ import {
 import { useApp } from '../../context/AppContext'
 import { epicDb, syncEpicsFromAdo, calcEpicTestDate } from '../../lib/epicDb'
 import { dateTone, toneClass, localIsoDate, utcDateFromIso } from '../../utils/epicDateTone'
+import { epicToProject, stripBuzzebees, isActiveEpic, isDeployedEpic } from '../../utils/epicMapping'
 import { addWorkingDaysH } from '../../utils/workingDayUtils'
 import TesterGanttView from '../planning/TesterGanttView'
 import type { Epic, AzureDevOpsConfig } from '../../types/epic'
-import type { PlanningProject } from '../../types/planning'
 import type { Employee } from '../../types'
 import { ADO_CONFIG_KEY } from '../../types/epic'
 
@@ -22,61 +22,12 @@ function fmt(iso: string | null | undefined): string {
   return `${d}/${m}/${y}`
 }
 
-function epicToProject(e: Epic): PlanningProject {
-  return {
-    id: e.id, iteration: stripBuzzebees(e.iteration), projectName: e.feature,
-    itemType: e.itemType, feature: stripBuzzebees(e.project), tags: '',
-    status: e.state, testLead: e.testLead, priority: '',
-    tester: e.testOwner,
-    goLiveDate: e.targetDate ?? e.uatDate ?? e.sitDate,
-    uatDate: e.uatDate ?? (e.targetDate ? null : e.sitDate),
-    testingPercent: e.testingPercent, testerFlag: e.testerFlag,
-    testerNote: e.testerNote, testEstimateDay: e.testEstimateDay,
-    testDate: e.testDate, remarkToPmos: '', pm: '', baNote: '',
-    quotationNo: String(e.epicNo), epicNo: String(e.epicNo),
-    createdAt: e.createdAt, updatedAt: e.updatedAt,
-  }
-}
-
-const DEPLOYED_STATES = new Set(['Deployed', 'Go-live Commercial'])
-
-/**
- * Status ที่แสดงในแท็บ Epic Table
- *
- * เป็น whitelist ไม่ใช่ blacklist — Status ที่ไม่อยู่ในลิสต์นี้ (Closed, Removed,
- * On Hold ฯลฯ) จะไม่ถูกแสดง ส่วนแท็บ Deployed และ Delay Plan ไม่ได้รับผลกระทบ
- *
- * เทียบแบบไม่สนตัวพิมพ์เล็ก-ใหญ่และช่องว่างหัวท้าย เพราะค่าที่ ADO ส่งมาสะกด
- * ไม่ตรงกันเป๊ะเสมอไป — ถ้าเทียบตรงๆ แถวจะหายไปเงียบๆ โดยไม่มีอะไรบอก
- */
-const TABLE_STATES = new Set([
-  'active',
-  'development',
-  'new',
-  'requirement gathering',
-  // "Test UAT" ที่ระบุมาไม่มีอยู่จริงใน ADO — ข้อมูลจริงมี 'Test' และ 'UAT'
-  // แยกเป็นคนละ state จึงใส่ทั้งคู่
-  'test',
-  'uat',
-  'wait for deploy',
-])
-
 // State ทั้งหมดที่มีในข้อมูลจริง ณ 31 ส.ค. 2026:
-//   ในลิสต์นี้ : Active · Development · New · Requirement Gathering · Test · UAT · Wait for deploy
-//   ไปแท็บอื่น : Deployed · Go-live Commercial  (→ แท็บ Deployed)
-//   ถูกตัดออก  : On hold · Retired
+//   isActiveEpic : Active · Development · New · Requirement Gathering · Test · UAT · Wait for deploy
+//   แท็บ Deployed : Deployed · Go-live Commercial
+//   ถูกตัดออก     : On hold · Retired
+// นิยามอยู่ใน utils/epicMapping.ts เพราะหน้า Monitor and Assign ใช้ชุดเดียวกัน
 
-function normalizeState(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, ' ')
-}
-
-function isTableEpic(e: Epic): boolean {
-  return TABLE_STATES.has(normalizeState(e.state ?? ''))
-}
-
-function isDeployedEpic(e: Epic): boolean {
-  return DEPLOYED_STATES.has(e.state)
-}
 function isDelayPlan(e: Epic, todayIso: string): boolean {
   if (isDeployedEpic(e)) return false
   return !!e.testDate && e.testDate >= todayIso && (e.testingPercent ?? 0) < 1
@@ -459,10 +410,6 @@ function TabBtn({ active, onClick, label, count }: {
 
 // ─── Epic Table ───────────────────────────────────────────────────────────────
 
-function stripBuzzebees(path: string): string {
-  return path.replace(/^Buzzebees\\/i, '').trim()
-}
-
 // ─── Stable inline-edit cells (defined at module level to preserve state) ─────
 
 function InlineNumber({ id, value, field, unit, min, max, onSave }: {
@@ -818,7 +765,7 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
 type Tab = 'table' | 'gantt' | 'deployed' | 'delayplan'
 
 export default function EpicView() {
-  const { employees, publicHolidays } = useApp()
+  const { employees, publicHolidays, epicInitialTester, setEpicInitialTester } = useApp()
   const holidaySet = useMemo(() => new Set<string>(publicHolidays.map((h: any) => h.date ?? h)), [publicHolidays])
   const activeEmployees = useMemo(() =>
     employees
@@ -851,7 +798,10 @@ export default function EpicView() {
 
   // Filters
   const [search,           setSearch]           = useState('')
-  const [filterOwners,     setFilterOwners]      = useState<string[]>([])
+  // มาจากการคลิกการ์ดในหน้า Monitor and Assign — กรอง Test Owner ไว้ให้ตั้งแต่เปิด
+  const [filterOwners,     setFilterOwners]      = useState<string[]>(
+    () => epicInitialTester ? [epicInitialTester] : [],
+  )
   const [filterStates,     setFilterStates]      = useState<string[]>([])
   const [filterTestLeads,  setFilterTestLeads]   = useState<string[]>([])
   const [filterIter,       setFilterIter]        = useState('')
@@ -862,6 +812,12 @@ export default function EpicView() {
 
   // Sort
   const [sort, setSort] = useState<{ field: SortField; dir: 'asc' | 'desc' }>({ field: 'epicNo', dir: 'asc' })
+
+  // ค่าที่ส่งมาจากหน้า Monitor and Assign ถูกอ่านไปแล้วตอนตั้ง filterOwners
+  // เคลียร์ทิ้งทันที ไม่งั้นครั้งหน้าที่เปิดหน้านี้ตรงๆ จะโดนกรองค้างไว้
+  useEffect(() => {
+    if (epicInitialTester) setEpicInitialTester(null)
+  }, [epicInitialTester, setEpicInitialTester])
 
   const epicsRef = useRef<Epic[]>([])
   useEffect(() => { epicsRef.current = epics }, [epics])
@@ -1045,7 +1001,7 @@ export default function EpicView() {
 
   // แท็บ Epic Table และ Gantt View ใช้ชุดข้อมูลเดียวกัน — กรอง Status เพิ่มอีกชั้น
   // Delay Plan ยังใช้ mainEpics เพราะต้องเห็น Epic ทุกสถานะที่ยังไม่ deploy
-  const tableEpics = useMemo(() => mainEpics.filter(isTableEpic), [mainEpics])
+  const tableEpics = useMemo(() => mainEpics.filter(isActiveEpic), [mainEpics])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const tableRows  = useMemo(() => applySort(applyFilters(tableEpics)), [tableEpics, search, filterOwners, filterStates, filterTestLeads, filterIter, filterUatFrom, filterUatTo, filterTargetFrom, filterTargetTo, sort])
