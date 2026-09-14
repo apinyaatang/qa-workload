@@ -30,7 +30,7 @@ function fmt(iso: string | null | undefined): string {
 
 function isDelayPlan(e: Epic, todayIso: string): boolean {
   if (isDeployedEpic(e)) return false
-  return !!e.testDate && e.testDate >= todayIso && (e.testingPercent ?? 0) < 1
+  return !!e.testDate && e.testDate <= todayIso && (e.testingPercent ?? 0) === 0
 }
 
 // ─── Portal dropdown ──────────────────────────────────────────────────────────
@@ -1156,7 +1156,7 @@ export default function EpicView() {
             <div>
               <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 text-amber-700 dark:text-amber-300 text-xs">
                 <AlertTriangle size={13} />
-                Epic ที่ Testing Date &gt;= วันนี้ และ Testing% &lt; 1%
+                Epic ที่ Testing Date &lt;= วันนี้ และ Testing % = 0
               </div>
               <EpicTable
                 rows={delayRows} epics={epics} savingIds={savingIds}
