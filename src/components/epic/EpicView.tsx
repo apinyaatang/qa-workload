@@ -762,7 +762,7 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
 
 // ─── Main View ────────────────────────────────────────────────────────────────
 
-type Tab = 'table' | 'gantt' | 'deployed' | 'delayplan'
+type Tab = 'table' | 'gantt' | 'deployed' | 'delayplan' | 'noplan'
 
 export default function EpicView() {
   const { employees, publicHolidays, epicInitialTester, setEpicInitialTester } = useApp()
@@ -998,18 +998,24 @@ export default function EpicView() {
   const mainEpics     = useMemo(() => epics.filter(e => !isDeployedEpic(e)), [epics])
   const deployedEpics = useMemo(() => epics.filter(e => isDeployedEpic(e)), [epics])
   const delayEpics    = useMemo(() => mainEpics.filter(e => isDelayPlan(e, todayIso)), [mainEpics, todayIso])
+  const noPlanEpics   = useMemo(() => mainEpics.filter(e => !e.uatDate && !e.targetDate), [mainEpics])
 
   // แท็บ Epic Table และ Gantt View ใช้ชุดข้อมูลเดียวกัน — กรอง Status เพิ่มอีกชั้น
+  // ซ่อน Epic ที่ไม่มีทั้ง UAT Date และ Target Date (เข้า Tab No plan แทน)
   // Delay Plan ยังใช้ mainEpics เพราะต้องเห็น Epic ทุกสถานะที่ยังไม่ deploy
-  const tableEpics = useMemo(() => mainEpics.filter(isActiveEpic), [mainEpics])
+  const tableEpics = useMemo(
+    () => mainEpics.filter(e => isActiveEpic(e) && !!(e.uatDate || e.targetDate)),
+    [mainEpics],
+  )
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const tableRows  = useMemo(() => applySort(applyFilters(tableEpics)), [tableEpics, search, filterOwners, filterStates, filterTestLeads, filterIter, filterUatFrom, filterUatTo, filterTargetFrom, filterTargetTo, sort])
   // Gantt ต่อยอดจาก tableRows ตรงๆ เพื่อการันตีว่าเห็นชุดเดียวกับตารางเสมอ
   // ถ้าแยกไปกรองเองซ้ำ สองแท็บจะเพี้ยนจากกันทันทีที่มีคนเพิ่ม filter ใหม่
   const ganttRows  = useMemo(() => tableRows.map(epicToProject), [tableRows])
-  const deployRows = useMemo(() => applySort(deployedEpics), [deployedEpics, sort])
-  const delayRows  = useMemo(() => applySort(delayEpics), [delayEpics, sort])
+  const deployRows  = useMemo(() => applySort(deployedEpics), [deployedEpics, sort])
+  const delayRows   = useMemo(() => applySort(delayEpics), [delayEpics, sort])
+  const noPlanRows  = useMemo(() => applySort(noPlanEpics), [noPlanEpics, sort])
 
   const uniqueStates = useMemo(() => [...new Set(epics.map(e => e.state).filter(Boolean))].sort(), [epics])
   const uniqueIters  = useMemo(() => [...new Set(epics.map(e => {
@@ -1047,6 +1053,7 @@ export default function EpicView() {
           <TabBtn active={tab === 'gantt'}    onClick={() => setTab('gantt')}    label="Gantt View"    count={loading ? undefined : tableEpics.length} />
           <TabBtn active={tab === 'deployed'} onClick={() => setTab('deployed')} label="Deployed"      count={loading ? undefined : deployedEpics.length} />
           <TabBtn active={tab === 'delayplan'} onClick={() => setTab('delayplan')} label="Delay Plan"  count={loading ? undefined : delayEpics.length} />
+          <TabBtn active={tab === 'noplan'}    onClick={() => setTab('noplan')}    label="No Plan"     count={loading ? undefined : noPlanEpics.length} />
           <div className="flex-1" />
           <div className="flex items-center gap-2 pb-2">
             {savingIds.size > 0 && (
@@ -1160,6 +1167,19 @@ export default function EpicView() {
               </div>
               <EpicTable
                 rows={delayRows} epics={epics} savingIds={savingIds}
+                employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
+                sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
+                expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
+              />
+            </div>
+          ) : tab === 'noplan' ? (
+            <div>
+              <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 text-xs">
+                <AlertCircle size={13} />
+                Epic ที่ยังไม่มี UAT Date และ Target Date (ยังไม่มีแผน)
+              </div>
+              <EpicTable
+                rows={noPlanRows} epics={epics} savingIds={savingIds}
                 employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
                 sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
                 expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
