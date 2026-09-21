@@ -16,6 +16,9 @@ export interface Epic {
   testEstimateDay: number | null
   testLead:        string        // manual
   testOwner:       string        // from employees
+  buddy1:          string        // co-tester 1
+  buddy2:          string        // co-tester 2
+  buddy3:          string        // co-tester 3
   createdAt:       string
   updatedAt:       string
 }

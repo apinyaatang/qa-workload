@@ -47,6 +47,9 @@ function fromRow(r: any): Epic {
     testEstimateDay: r.test_estimate_day ?? null,
     testLead:        r.test_lead        ?? '',
     testOwner:       r.test_owner       ?? '',
+    buddy1:          r.buddy1           ?? '',
+    buddy2:          r.buddy2           ?? '',
+    buddy3:          r.buddy3           ?? '',
     createdAt:       r.created_at,
     updatedAt:       r.updated_at,
   }
@@ -223,7 +226,7 @@ export async function syncEpicsFromAdo(
         // Insert with null defaults for QA fields
         const { error } = await (supabase as any)
           .from('epics')
-          .insert({ ...adoFields, testing_percent: null, tester_flag: null, tester_note: '', test_estimate_day: null, test_lead: '', test_owner: '' })
+          .insert({ ...adoFields, testing_percent: null, tester_flag: null, tester_note: '', test_estimate_day: null, test_lead: '', test_owner: '', buddy1: '', buddy2: '', buddy3: '' })
         if (error) { result.errors.push(`Insert epic ${epicNo}: ${error.message}`); continue }
         result.inserted++
       }

@@ -7,7 +7,7 @@ import {
 import { useApp } from '../../context/AppContext'
 import { epicDb, syncEpicsFromAdo, calcEpicTestDate } from '../../lib/epicDb'
 import { dateTone, toneClass, localIsoDate, utcDateFromIso } from '../../utils/epicDateTone'
-import { epicToProject, stripBuzzebees, isActiveEpic, isDeployedEpic } from '../../utils/epicMapping'
+import { epicToProject, epicToProjects, stripBuzzebees, isActiveEpic, isDeployedEpic } from '../../utils/epicMapping'
 import { addWorkingDaysH } from '../../utils/workingDayUtils'
 import TesterGanttView from '../planning/TesterGanttView'
 import type { Epic, AzureDevOpsConfig } from '../../types/epic'
@@ -488,6 +488,9 @@ const COL_DEFS = [
   { key: 'type',       label: 'Type',        sortField: null,              hideable: true,  defaultW: 80  },
   { key: 'state',      label: 'State',       sortField: 'state',           hideable: true,  defaultW: 110 },
   { key: 'testOwner',  label: 'Test Owner',  sortField: 'testOwner',       hideable: true,  defaultW: 170 },
+  { key: 'buddy1',     label: 'Buddy 1',     sortField: null,              hideable: true,  defaultW: 170 },
+  { key: 'buddy2',     label: 'Buddy 2',     sortField: null,              hideable: true,  defaultW: 170 },
+  { key: 'buddy3',     label: 'Buddy 3',     sortField: null,              hideable: true,  defaultW: 170 },
   { key: 'testLead',   label: 'Test Lead',   sortField: null,              hideable: true,  defaultW: 180 },
   { key: 'estDay',     label: 'Est.(d)',      sortField: 'testEstimateDay', hideable: true,  defaultW: 72  },
   { key: 'testDate',   label: 'Test Date',   sortField: 'testDate',        hideable: true,  defaultW: 100 },
@@ -687,6 +690,9 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
               {vis('type')       && <Th colKey="type"       label="Type"        sortField="itemType" />}
               {vis('state')      && <Th colKey="state"      label="State"       sortField="state" />}
               {vis('testOwner')  && <Th colKey="testOwner"  label="Test Owner"  sortField="testOwner" />}
+              {vis('buddy1')     && <Th colKey="buddy1"     label="Buddy 1" />}
+              {vis('buddy2')     && <Th colKey="buddy2"     label="Buddy 2" />}
+              {vis('buddy3')     && <Th colKey="buddy3"     label="Buddy 3" />}
               {vis('testLead')   && <Th colKey="testLead"   label="Test Lead"   sortField="testLead" />}
               {vis('estDay')     && <Th colKey="estDay"     label="Est.(d)"     sortField="testEstimateDay" />}
               {vis('testDate')   && <Th colKey="testDate"   label="Test Date"   sortField="testDate" />}
@@ -720,6 +726,21 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
                   {vis('testOwner')  && (
                     <td className={tdBase}>
                       <PortalSelect value={epic.testOwner} options={['Unassigned', ...empNames]} placeholder="— Test Owner —" onChange={v => onSave(epic.id, { testOwner: v })} minWidth={180} />
+                    </td>
+                  )}
+                  {vis('buddy1') && (
+                    <td className={tdBase}>
+                      <PortalSelect value={epic.buddy1} options={['Unassigned', ...empNames]} placeholder="— Buddy 1 —" onChange={v => onSave(epic.id, { buddy1: v })} minWidth={180} />
+                    </td>
+                  )}
+                  {vis('buddy2') && (
+                    <td className={tdBase}>
+                      <PortalSelect value={epic.buddy2} options={['Unassigned', ...empNames]} placeholder="— Buddy 2 —" onChange={v => onSave(epic.id, { buddy2: v })} minWidth={180} />
+                    </td>
+                  )}
+                  {vis('buddy3') && (
+                    <td className={tdBase}>
+                      <PortalSelect value={epic.buddy3} options={['Unassigned', ...empNames]} placeholder="— Buddy 3 —" onChange={v => onSave(epic.id, { buddy3: v })} minWidth={180} />
                     </td>
                   )}
                   {vis('testLead')   && (
@@ -875,6 +896,9 @@ export default function EpicView() {
     if ('testerFlag'      in patch) fields.tester_flag       = (patch.testerFlag ?? []).length ? patch.testerFlag : null
     if ('testerNote'      in patch) fields.tester_note       = patch.testerNote ?? ''
     if ('testOwner'       in patch) fields.test_owner        = patch.testOwner ?? ''
+    if ('buddy1'          in patch) fields.buddy1             = patch.buddy1    ?? ''
+    if ('buddy2'          in patch) fields.buddy2             = patch.buddy2    ?? ''
+    if ('buddy3'          in patch) fields.buddy3             = patch.buddy3    ?? ''
     if ('testLead'        in patch) fields.test_lead         = patch.testLead  ?? ''
     // recalculated test_date
     if ('testEstimateDay' in patch || 'uatDate' in patch || 'targetDate' in patch) {
@@ -1016,7 +1040,7 @@ export default function EpicView() {
   const tableRows  = useMemo(() => applySort(applyFilters(tableEpics)), [tableEpics, search, filterOwners, filterStates, filterTestLeads, filterIter, filterUatFrom, filterUatTo, filterTargetFrom, filterTargetTo, sort])
   // Gantt ต่อยอดจาก tableRows ตรงๆ เพื่อการันตีว่าเห็นชุดเดียวกับตารางเสมอ
   // ถ้าแยกไปกรองเองซ้ำ สองแท็บจะเพี้ยนจากกันทันทีที่มีคนเพิ่ม filter ใหม่
-  const ganttRows  = useMemo(() => tableRows.map(epicToProject), [tableRows])
+  const ganttRows  = useMemo(() => tableRows.flatMap(epicToProjects), [tableRows])
   const deployRows  = useMemo(() => applySort(deployedEpics), [deployedEpics, sort])
   const delayRows   = useMemo(() => applySort(delayEpics), [delayEpics, sort])
   const noPlanRows       = useMemo(() => applySort(noPlanEpics), [noPlanEpics, sort])

@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext'
 import { User, Calendar, ClipboardList, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
 import AddLeaveModal from './AddLeaveModal'
 import { epicDb } from '../../lib/epicDb'
-import { epicToProject, isActiveEpic } from '../../utils/epicMapping'
+import { epicToProjects, isActiveEpic } from '../../utils/epicMapping'
 import type { PlanningProject } from '../../types/planning'
 import type { Employee } from '../../types'
 import { calcAllTesterWorkloads, WORKLOAD_COLORS, type QaWorkloadStatus } from '../../utils/qaWorkloadCalc'
@@ -209,7 +209,7 @@ export default function EmployeesView() {
         if (cancelled) return
         // นับเฉพาะงานที่ยังเดินอยู่ ชุดเดียวกับแท็บ Epic Table และ Gantt View
         // (ตัด Deployed / Go-live Commercial / On hold / Retired ออก)
-        setProjects(epics.filter(isActiveEpic).map(epicToProject))
+        setProjects(epics.filter(isActiveEpic).flatMap(epicToProjects))
       })
       .catch(() => { if (!cancelled) setError('โหลดข้อมูล Epic ไม่สำเร็จ') })
       .finally(() => { if (!cancelled) setLoading(false) })

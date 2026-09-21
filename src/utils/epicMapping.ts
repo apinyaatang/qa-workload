@@ -38,6 +38,24 @@ export function epicToProject(e: Epic): PlanningProject {
   }
 }
 
+/**
+ * ขยาย Epic เป็นหลาย PlanningProject — 1 row ต่อ 1 คนที่รับผิดชอบ
+ *
+ * testOwner ได้ row แรกเสมอ
+ * buddy1/2/3 ที่ไม่ว่างและไม่ใช่ "Unassigned" จะได้ row เพิ่มเติม
+ * ทำให้ Gantt View และ Monitor and Assign เห็น Epic นี้ในชื่อของทุกคนที่เกี่ยวข้อง
+ */
+export function epicToProjects(e: Epic): PlanningProject[] {
+  const base = epicToProject(e)
+  const rows: PlanningProject[] = [base]
+  for (const buddy of [e.buddy1, e.buddy2, e.buddy3]) {
+    if (buddy && buddy !== 'Unassigned') {
+      rows.push({ ...base, tester: buddy })
+    }
+  }
+  return rows
+}
+
 // ─── การจัดกลุ่มตาม Status ────────────────────────────────────────────────────
 
 const DEPLOYED_STATES = new Set(['Deployed', 'Go-live Commercial'])
