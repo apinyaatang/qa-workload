@@ -832,23 +832,25 @@ export default function EpicView() {
   const [expanded,    setExpanded]    = useState(false)
 
   // Filters
-  const [search,           setSearch]           = useState('')
-  // มาจากการคลิกการ์ดในหน้า Monitor and Assign — กรอง Test Owner ไว้ให้ตั้งแต่เปิด
-  const [filterOwners,     setFilterOwners]      = useState<string[]>(
+  const [search,            setSearch]            = useState('')
+  const [filterOwners,      setFilterOwners]      = useState<string[]>([])
+  const [filterStates,      setFilterStates]      = useState<string[]>([])
+  const [filterTestLeads,   setFilterTestLeads]   = useState<string[]>([])
+  // Assignee Workload: กรองทุกคนที่เป็น testOwner หรือ buddy1/2/3
+  // มาจากการคลิก "ดู Epic ของคนนี้" ในหน้า Monitor and Assign
+  const [filterAssignees,   setFilterAssignees]   = useState<string[]>(
     () => epicInitialTester ? [epicInitialTester] : [],
   )
-  const [filterStates,     setFilterStates]      = useState<string[]>([])
-  const [filterTestLeads,  setFilterTestLeads]   = useState<string[]>([])
-  const [filterIter,       setFilterIter]        = useState('')
-  const [filterUatFrom,    setFilterUatFrom]     = useState('')
-  const [filterUatTo,      setFilterUatTo]       = useState('')
-  const [filterTargetFrom, setFilterTargetFrom]  = useState('')
-  const [filterTargetTo,   setFilterTargetTo]    = useState('')
+  const [filterIter,        setFilterIter]        = useState('')
+  const [filterUatFrom,     setFilterUatFrom]     = useState('')
+  const [filterUatTo,       setFilterUatTo]       = useState('')
+  const [filterTargetFrom,  setFilterTargetFrom]  = useState('')
+  const [filterTargetTo,    setFilterTargetTo]    = useState('')
 
   // Sort
   const [sort, setSort] = useState<{ field: SortField; dir: 'asc' | 'desc' }>({ field: 'epicNo', dir: 'asc' })
 
-  // ค่าที่ส่งมาจากหน้า Monitor and Assign ถูกอ่านไปแล้วตอนตั้ง filterOwners
+  // ค่าที่ส่งมาจากหน้า Monitor and Assign ถูกอ่านไปแล้วตอนตั้ง filterAssignees
   // เคลียร์ทิ้งทันที ไม่งั้นครั้งหน้าที่เปิดหน้านี้ตรงๆ จะโดนกรองค้างไว้
   useEffect(() => {
     if (epicInitialTester) setEpicInitialTester(null)
@@ -1017,6 +1019,10 @@ export default function EpicView() {
       if (filterOwners.length    && !filterOwners.includes(e.testOwner))  return false
       if (filterStates.length    && !filterStates.includes(e.state))      return false
       if (filterTestLeads.length && !filterTestLeads.includes(e.testLead)) return false
+      if (filterAssignees.length) {
+        const assigned = [e.testOwner, e.buddy1, e.buddy2, e.buddy3]
+        if (!filterAssignees.some(a => assigned.includes(a))) return false
+      }
       if (filterIter             && !e.iteration.includes(filterIter))    return false
       if (filterUatFrom    && (e.uatDate    ?? '') < filterUatFrom)    return false
       if (filterUatTo      && (e.uatDate    ?? '9999') > filterUatTo)  return false
@@ -1026,10 +1032,10 @@ export default function EpicView() {
     })
   }
 
-  const hasActiveFilter = !!(search || filterOwners.length || filterStates.length || filterTestLeads.length || filterIter || filterUatFrom || filterUatTo || filterTargetFrom || filterTargetTo)
+  const hasActiveFilter = !!(search || filterOwners.length || filterAssignees.length || filterStates.length || filterTestLeads.length || filterIter || filterUatFrom || filterUatTo || filterTargetFrom || filterTargetTo)
 
   function clearAllFilters() {
-    setSearch(''); setFilterOwners([]); setFilterStates([]); setFilterTestLeads([])
+    setSearch(''); setFilterOwners([]); setFilterAssignees([]); setFilterStates([]); setFilterTestLeads([])
     setFilterIter(''); setFilterUatFrom(''); setFilterUatTo(''); setFilterTargetFrom(''); setFilterTargetTo('')
   }
 
@@ -1051,7 +1057,7 @@ export default function EpicView() {
   )
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const tableRows  = useMemo(() => applySort(applyFilters(tableEpics)), [tableEpics, search, filterOwners, filterStates, filterTestLeads, filterIter, filterUatFrom, filterUatTo, filterTargetFrom, filterTargetTo, sort])
+  const tableRows  = useMemo(() => applySort(applyFilters(tableEpics)), [tableEpics, search, filterOwners, filterAssignees, filterStates, filterTestLeads, filterIter, filterUatFrom, filterUatTo, filterTargetFrom, filterTargetTo, sort])
   // Gantt ต่อยอดจาก tableRows ตรงๆ เพื่อการันตีว่าเห็นชุดเดียวกับตารางเสมอ
   // ถ้าแยกไปกรองเองซ้ำ สองแท็บจะเพี้ยนจากกันทันทีที่มีคนเพิ่ม filter ใหม่
   const ganttRows  = useMemo(() => tableRows.flatMap(epicToProjects), [tableRows])
@@ -1128,6 +1134,10 @@ export default function EpicView() {
             {/* Status multi-select */}
             <MultiSelect value={filterStates} options={uniqueStates} placeholder="ทุก Status"
               onChange={setFilterStates} minWidth={130} />
+
+            {/* Assignee Workload — กรอง testOwner หรือ buddy1/2/3 */}
+            <MultiSelect value={filterAssignees} options={['Unassigned', ...activeEmployees.map(e => e.name)]} placeholder="Assignee Workload"
+              onChange={setFilterAssignees} minWidth={168} />
 
             {/* Test Owner multi-select */}
             <MultiSelect value={filterOwners} options={['Unassigned', '', ...activeEmployees.map(e => e.name)]} placeholder="ทุก Test Owner"
