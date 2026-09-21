@@ -7,7 +7,7 @@ import {
 import { useApp } from '../../context/AppContext'
 import { epicDb, syncEpicsFromAdo, calcEpicTestDate } from '../../lib/epicDb'
 import { dateTone, toneClass, localIsoDate, utcDateFromIso } from '../../utils/epicDateTone'
-import { epicToProject, epicToProjects, stripBuzzebees, isActiveEpic, isDeployedEpic } from '../../utils/epicMapping'
+import { epicToProjects, stripBuzzebees, isActiveEpic, isDeployedEpic } from '../../utils/epicMapping'
 import { addWorkingDaysH } from '../../utils/workingDayUtils'
 import TesterGanttView from '../planning/TesterGanttView'
 import type { Epic, AzureDevOpsConfig } from '../../types/epic'
@@ -708,7 +708,7 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={visibleCols.size} className="py-12 text-center text-sm text-gray-400">ไม่มีข้อมูล Epic ที่ตรงกับ Filter</td></tr>
+              <tr><td colSpan={visCount} className="py-12 text-center text-sm text-gray-400">ไม่มีข้อมูล Epic ที่ตรงกับ Filter</td></tr>
             )}
             {rows.map((epic, idx) => {
               const isSaving   = savingIds.has(epic.id)
