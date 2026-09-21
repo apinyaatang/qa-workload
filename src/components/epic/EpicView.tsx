@@ -559,6 +559,8 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
   const [hiddenCols,  setHiddenCols]  = useState<Set<ColKey>>(initHiddenCols)
   const [colWidths,   setColWidths]   = useState<Record<string, number>>(initColWidths)
   const [showColPanel, setShowColPanel] = useState(false)
+  const [colPanelPos, setColPanelPos] = useState({ top: 0, right: 0 })
+  const colBtnRef   = useRef<HTMLButtonElement>(null)
   const colPanelRef = useRef<HTMLDivElement>(null)
   const resizeDrag  = useRef<{ col: string; startX: number; startW: number } | null>(null)
 
@@ -571,11 +573,20 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
     localStorage.setItem(LS_WIDS, JSON.stringify(colWidths))
   }, [colWidths])
 
+  function openColPanel() {
+    if (colBtnRef.current) {
+      const r = colBtnRef.current.getBoundingClientRect()
+      setColPanelPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+    }
+    setShowColPanel(s => !s)
+  }
+
   // Close column panel on outside click
   useEffect(() => {
     if (!showColPanel) return
     function h(e: MouseEvent) {
-      if (!colPanelRef.current?.contains(e.target as Node)) setShowColPanel(false)
+      const t = e.target as Node
+      if (!colBtnRef.current?.contains(t) && !colPanelRef.current?.contains(t)) setShowColPanel(false)
     }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
@@ -637,36 +648,37 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
       {/* Toolbar */}
       <div className="flex items-center justify-end gap-2 mb-2">
         {/* Column visibility */}
-        <div className="relative" ref={colPanelRef}>
-          <button onClick={() => setShowColPanel(s => !s)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-600 transition-colors">
-            <SlidersHorizontal size={13} /> คอลัมน์ ({visCount}/{hideableCount})
-          </button>
-          {showColPanel && (
-            <div className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl shadow-xl p-3 min-w-[200px] max-h-96 overflow-y-auto">
-              <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100 dark:border-slate-700">
-                <span className="text-xs font-semibold text-gray-600 dark:text-slate-300">แสดง/ซ่อน คอลัมน์</span>
-                <div className="flex gap-1">
-                  <button onClick={() => setHiddenCols(new Set())} className="text-[10px] text-indigo-500 hover:underline">ทั้งหมด</button>
-                  <span className="text-gray-300">·</span>
-                  <button onClick={() => setHiddenCols(new Set(COL_DEFS.filter(c => c.hideable).map(c => c.key)))} className="text-[10px] text-gray-400 hover:underline">ซ่อนทั้งหมด</button>
-                </div>
+        <button ref={colBtnRef} onClick={openColPanel}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-600 transition-colors">
+          <SlidersHorizontal size={13} /> คอลัมน์ ({visCount}/{hideableCount})
+        </button>
+        {showColPanel && createPortal(
+          <div ref={colPanelRef}
+            style={{ position: 'fixed', top: colPanelPos.top, right: colPanelPos.right, zIndex: 9999 }}
+            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl shadow-xl p-3 w-52 max-h-96 overflow-y-auto">
+            <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100 dark:border-slate-700">
+              <span className="text-xs font-semibold text-gray-600 dark:text-slate-300">แสดง/ซ่อน คอลัมน์</span>
+              <div className="flex gap-1">
+                <button onClick={() => setHiddenCols(new Set())} className="text-[10px] text-indigo-500 hover:underline">ทั้งหมด</button>
+                <span className="text-gray-300">·</span>
+                <button onClick={() => setHiddenCols(new Set(COL_DEFS.filter(c => c.hideable).map(c => c.key)))} className="text-[10px] text-gray-400 hover:underline">ซ่อนทั้งหมด</button>
               </div>
-              {COL_DEFS.filter(c => c.hideable).map(col => (
-                <label key={col.key} className="flex items-center gap-2 py-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 rounded px-1">
-                  <input type="checkbox" checked={!hiddenCols.has(col.key)}
-                    onChange={() => setHiddenCols(prev => {
-                      const next = new Set(prev)
-                      next.has(col.key) ? next.delete(col.key) : next.add(col.key)
-                      return next
-                    })}
-                    className="w-3.5 h-3.5 accent-indigo-600" />
-                  <span className="text-xs text-gray-700 dark:text-slate-200">{col.label}</span>
-                </label>
-              ))}
             </div>
-          )}
-        </div>
+            {COL_DEFS.filter(c => c.hideable).map(col => (
+              <label key={col.key} className="flex items-center gap-2 py-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 rounded px-1">
+                <input type="checkbox" checked={!hiddenCols.has(col.key)}
+                  onChange={() => setHiddenCols(prev => {
+                    const next = new Set(prev)
+                    next.has(col.key) ? next.delete(col.key) : next.add(col.key)
+                    return next
+                  })}
+                  className="w-3.5 h-3.5 accent-indigo-600" />
+                <span className="text-xs text-gray-700 dark:text-slate-200">{col.label}</span>
+              </label>
+            ))}
+          </div>,
+          document.body,
+        )}
         {/* Expand */}
         <button onClick={onToggleExpand}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-600 transition-colors">
@@ -1118,11 +1130,11 @@ export default function EpicView() {
               onChange={setFilterStates} minWidth={130} />
 
             {/* Test Owner multi-select */}
-            <MultiSelect value={filterOwners} options={['', ...activeEmployees.map(e => e.name)]} placeholder="ทุก Test Owner"
+            <MultiSelect value={filterOwners} options={['Unassigned', '', ...activeEmployees.map(e => e.name)]} placeholder="ทุก Test Owner"
               onChange={setFilterOwners} minWidth={148} />
 
             {/* Test Lead multi-select */}
-            <MultiSelect value={filterTestLeads} options={['', ...testLeadOptions]} placeholder="ทุก Test Lead"
+            <MultiSelect value={filterTestLeads} options={['Unassigned', '', ...testLeadOptions]} placeholder="ทุก Test Lead"
               onChange={setFilterTestLeads} minWidth={148} />
 
             {/* Iteration single select */}
