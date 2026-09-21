@@ -505,15 +505,16 @@ const COL_DEFS = [
 type ColKey = typeof COL_DEFS[number]['key']
 type SortField = 'epicNo' | 'iteration' | 'project' | 'feature' | 'itemType' | 'state' | 'testOwner' | 'testLead' | 'testEstimateDay' | 'testDate' | 'sitDate' | 'uatDate' | 'targetDate' | 'testingPercent'
 
-const LS_VIS  = 'epic_visible_cols'
-const LS_WIDS = 'epic_col_widths'
+// Store HIDDEN cols (not visible) so new columns auto-appear without clearing localStorage
+const LS_HIDDEN = 'epic_hidden_cols'
+const LS_WIDS   = 'epic_col_widths'
 
-function initVisibleCols(): Set<ColKey> {
+function initHiddenCols(): Set<ColKey> {
   try {
-    const saved = JSON.parse(localStorage.getItem(LS_VIS) ?? 'null')
+    const saved = JSON.parse(localStorage.getItem(LS_HIDDEN) ?? 'null')
     if (Array.isArray(saved)) return new Set(saved as ColKey[])
   } catch {}
-  return new Set(COL_DEFS.map(c => c.key))
+  return new Set<ColKey>()
 }
 function initColWidths(): Record<string, number> {
   const defaults = Object.fromEntries(COL_DEFS.map(c => [c.key, c.defaultW]))
@@ -555,16 +556,16 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
   const todayIso = localIsoDate(today)
   const empNames = employees.map(e => e.name)
 
-  const [visibleCols, setVisibleCols] = useState<Set<ColKey>>(initVisibleCols)
+  const [hiddenCols,  setHiddenCols]  = useState<Set<ColKey>>(initHiddenCols)
   const [colWidths,   setColWidths]   = useState<Record<string, number>>(initColWidths)
   const [showColPanel, setShowColPanel] = useState(false)
   const colPanelRef = useRef<HTMLDivElement>(null)
   const resizeDrag  = useRef<{ col: string; startX: number; startW: number } | null>(null)
 
-  // Persist visibility
+  // Persist hidden columns
   useEffect(() => {
-    localStorage.setItem(LS_VIS, JSON.stringify([...visibleCols]))
-  }, [visibleCols])
+    localStorage.setItem(LS_HIDDEN, JSON.stringify([...hiddenCols]))
+  }, [hiddenCols])
   // Persist widths
   useEffect(() => {
     localStorage.setItem(LS_WIDS, JSON.stringify(colWidths))
@@ -600,7 +601,7 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
     document.addEventListener('mouseup',   onUp)
   }
 
-  const vis = (k: ColKey) => visibleCols.has(k)
+  const vis = (k: ColKey) => !hiddenCols.has(k)
 
   const thBase = 'px-2 py-2.5 text-left text-[11px] font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide whitespace-nowrap bg-gray-50 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-600 relative select-none overflow-hidden'
   const tdBase = 'px-2 py-2 text-xs text-gray-700 dark:text-slate-200 border-b border-gray-100 dark:border-slate-700 align-middle overflow-hidden'
@@ -628,7 +629,8 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
     )
   }
 
-  const visCount = COL_DEFS.filter(c => c.hideable && vis(c.key)).length
+  const hideableCount = COL_DEFS.filter(c => c.hideable).length
+  const visCount = hideableCount - COL_DEFS.filter(c => c.hideable && hiddenCols.has(c.key)).length
 
   return (
     <div>
@@ -638,22 +640,22 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
         <div className="relative" ref={colPanelRef}>
           <button onClick={() => setShowColPanel(s => !s)}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-600 transition-colors">
-            <SlidersHorizontal size={13} /> คอลัมน์ ({visCount}/{COL_DEFS.filter(c => c.hideable).length})
+            <SlidersHorizontal size={13} /> คอลัมน์ ({visCount}/{hideableCount})
           </button>
           {showColPanel && (
             <div className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl shadow-xl p-3 min-w-[200px] max-h-96 overflow-y-auto">
               <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100 dark:border-slate-700">
                 <span className="text-xs font-semibold text-gray-600 dark:text-slate-300">แสดง/ซ่อน คอลัมน์</span>
                 <div className="flex gap-1">
-                  <button onClick={() => setVisibleCols(new Set(COL_DEFS.map(c => c.key)))} className="text-[10px] text-indigo-500 hover:underline">ทั้งหมด</button>
+                  <button onClick={() => setHiddenCols(new Set())} className="text-[10px] text-indigo-500 hover:underline">ทั้งหมด</button>
                   <span className="text-gray-300">·</span>
-                  <button onClick={() => setVisibleCols(new Set(COL_DEFS.filter(c => !c.hideable).map(c => c.key)))} className="text-[10px] text-gray-400 hover:underline">ซ่อนทั้งหมด</button>
+                  <button onClick={() => setHiddenCols(new Set(COL_DEFS.filter(c => c.hideable).map(c => c.key)))} className="text-[10px] text-gray-400 hover:underline">ซ่อนทั้งหมด</button>
                 </div>
               </div>
               {COL_DEFS.filter(c => c.hideable).map(col => (
                 <label key={col.key} className="flex items-center gap-2 py-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 rounded px-1">
-                  <input type="checkbox" checked={vis(col.key)}
-                    onChange={() => setVisibleCols(prev => {
+                  <input type="checkbox" checked={!hiddenCols.has(col.key)}
+                    onChange={() => setHiddenCols(prev => {
                       const next = new Set(prev)
                       next.has(col.key) ? next.delete(col.key) : next.add(col.key)
                       return next
