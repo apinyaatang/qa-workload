@@ -719,12 +719,12 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
                   {vis('state')      && <td className={tdBase}><span className="text-xs truncate block">{epic.state || '—'}</span></td>}
                   {vis('testOwner')  && (
                     <td className={tdBase}>
-                      <PortalSelect value={epic.testOwner} options={empNames} placeholder="— Test Owner —" onChange={v => onSave(epic.id, { testOwner: v })} minWidth={180} />
+                      <PortalSelect value={epic.testOwner} options={['Unassigned', ...empNames]} placeholder="— Test Owner —" onChange={v => onSave(epic.id, { testOwner: v })} minWidth={180} />
                     </td>
                   )}
                   {vis('testLead')   && (
                     <td className={tdBase}>
-                      <PortalSelect value={epic.testLead} options={testLeadOptions} placeholder="— Test Lead —" onChange={v => onSave(epic.id, { testLead: v })} minWidth={200} />
+                      <PortalSelect value={epic.testLead} options={['Unassigned', ...testLeadOptions]} placeholder="— Test Lead —" onChange={v => onSave(epic.id, { testLead: v })} minWidth={200} />
                     </td>
                   )}
                   {vis('estDay')     && <td className={`${tdBase} text-center`}><InlineNumber id={epic.id} value={epic.testEstimateDay} field="testEstimateDay" unit="d" min={0} onSave={onSave} /></td>}
@@ -762,7 +762,7 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
 
 // ─── Main View ────────────────────────────────────────────────────────────────
 
-type Tab = 'table' | 'gantt' | 'deployed' | 'delayplan' | 'noplan'
+type Tab = 'table' | 'gantt' | 'deployed' | 'delayplan' | 'noplan' | 'unassigned'
 
 export default function EpicView() {
   const { employees, publicHolidays, epicInitialTester, setEpicInitialTester } = useApp()
@@ -998,7 +998,11 @@ export default function EpicView() {
   const mainEpics     = useMemo(() => epics.filter(e => !isDeployedEpic(e)), [epics])
   const deployedEpics = useMemo(() => epics.filter(e => isDeployedEpic(e)), [epics])
   const delayEpics    = useMemo(() => mainEpics.filter(e => isDelayPlan(e, todayIso)), [mainEpics, todayIso])
-  const noPlanEpics   = useMemo(() => mainEpics.filter(e => !e.uatDate && !e.targetDate), [mainEpics])
+  const noPlanEpics      = useMemo(() => mainEpics.filter(e => !e.uatDate && !e.targetDate), [mainEpics])
+  const unassignedEpics  = useMemo(
+    () => mainEpics.filter(isActiveEpic).filter(e => e.testOwner === 'Unassigned' || e.testLead === 'Unassigned'),
+    [mainEpics],
+  )
 
   // แท็บ Epic Table และ Gantt View ใช้ชุดข้อมูลเดียวกัน — กรอง Status เพิ่มอีกชั้น
   // ซ่อน Epic ที่ไม่มีทั้ง UAT Date และ Target Date (เข้า Tab No plan แทน)
@@ -1015,7 +1019,8 @@ export default function EpicView() {
   const ganttRows  = useMemo(() => tableRows.map(epicToProject), [tableRows])
   const deployRows  = useMemo(() => applySort(deployedEpics), [deployedEpics, sort])
   const delayRows   = useMemo(() => applySort(delayEpics), [delayEpics, sort])
-  const noPlanRows  = useMemo(() => applySort(noPlanEpics), [noPlanEpics, sort])
+  const noPlanRows       = useMemo(() => applySort(noPlanEpics), [noPlanEpics, sort])
+  const unassignedRows   = useMemo(() => applySort(unassignedEpics), [unassignedEpics, sort])
 
   const uniqueStates = useMemo(() => [...new Set(epics.map(e => e.state).filter(Boolean))].sort(), [epics])
   const uniqueIters  = useMemo(() => [...new Set(epics.map(e => {
@@ -1053,7 +1058,8 @@ export default function EpicView() {
           <TabBtn active={tab === 'gantt'}    onClick={() => setTab('gantt')}    label="Gantt View"    count={loading ? undefined : tableEpics.length} />
           <TabBtn active={tab === 'deployed'} onClick={() => setTab('deployed')} label="Deployed"      count={loading ? undefined : deployedEpics.length} />
           <TabBtn active={tab === 'delayplan'} onClick={() => setTab('delayplan')} label="Delay Plan"  count={loading ? undefined : delayEpics.length} />
-          <TabBtn active={tab === 'noplan'}    onClick={() => setTab('noplan')}    label="No Plan"     count={loading ? undefined : noPlanEpics.length} />
+          <TabBtn active={tab === 'noplan'}      onClick={() => setTab('noplan')}      label="No Plan"          count={loading ? undefined : noPlanEpics.length} />
+          <TabBtn active={tab === 'unassigned'} onClick={() => setTab('unassigned')} label="Unassigned Tasks" count={loading ? undefined : unassignedEpics.length} />
           <div className="flex-1" />
           <div className="flex items-center gap-2 pb-2">
             {savingIds.size > 0 && (
@@ -1180,6 +1186,19 @@ export default function EpicView() {
               </div>
               <EpicTable
                 rows={noPlanRows} epics={epics} savingIds={savingIds}
+                employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
+                sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
+                expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
+              />
+            </div>
+          ) : tab === 'unassigned' ? (
+            <div>
+              <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 text-orange-700 dark:text-orange-300 text-xs">
+                <AlertTriangle size={13} />
+                Epic ที่ Test Owner = Unassigned หรือ Test Lead = Unassigned
+              </div>
+              <EpicTable
+                rows={unassignedRows} epics={epics} savingIds={savingIds}
                 employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
                 sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
                 expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
