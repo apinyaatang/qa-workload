@@ -1052,7 +1052,12 @@ export default function EpicView() {
   // ซ่อน Epic ที่ไม่มีทั้ง UAT Date และ Target Date (เข้า Tab No plan แทน)
   // Delay Plan ยังใช้ mainEpics เพราะต้องเห็น Epic ทุกสถานะที่ยังไม่ deploy
   const tableEpics = useMemo(
-    () => mainEpics.filter(e => isActiveEpic(e) && !!(e.uatDate || e.targetDate)),
+    () => mainEpics.filter(e =>
+      isActiveEpic(e) &&
+      !!(e.uatDate || e.targetDate) &&
+      e.testOwner !== 'Unassigned' &&
+      e.testLead  !== 'Unassigned'
+    ),
     [mainEpics],
   )
 
