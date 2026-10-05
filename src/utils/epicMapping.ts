@@ -6,7 +6,9 @@
 // ที่มีคนแก้การ map ฝั่งใดฝั่งหนึ่ง
 
 import type { Epic } from '../types/epic'
+import type { ExtraTask } from '../types/extraTask'
 import type { PlanningProject } from '../types/planning'
+import { calcEpicTestDate } from '../lib/epicDb'
 
 export function stripBuzzebees(path: string): string {
   return path.replace(/^Buzzebees\\/i, '').trim()
@@ -54,6 +56,40 @@ export function epicToProjects(e: Epic): PlanningProject[] {
     }
   }
   return rows
+}
+
+// ─── Extra Task → Epic shape ──────────────────────────────────────────────────
+
+/**
+ * แปลง ExtraTask เป็น Epic shape เพื่อให้แสดงใน Epic Table และ Gantt View
+ * epicNo = 0 ใช้เป็น marker ว่าเป็น Extra Task (ไม่ใช่ Epic จาก ADO)
+ */
+export function extraTaskToEpic(task: ExtraTask, holidays: Set<string> = new Set()): Epic {
+  const testDate = calcEpicTestDate(null, task.goLiveDate, task.testEstimateDay, holidays)
+  return {
+    id:              task.id,
+    epicNo:          0,
+    itemType:        task.type,
+    iteration:       '',
+    project:         task.projectName,
+    feature:         task.remark || task.projectName,
+    state:           task.status,
+    sitDate:         null,
+    uatDate:         null,
+    targetDate:      task.goLiveDate,
+    testDate,
+    testingPercent:  task.testingPercent,
+    testerFlag:      task.testerFlag,
+    testerNote:      '',
+    testEstimateDay: task.testEstimateDay,
+    testLead:        '',
+    testOwner:       task.tester ?? '',
+    buddy1:          '',
+    buddy2:          '',
+    buddy3:          '',
+    createdAt:       task.createdAt,
+    updatedAt:       task.updatedAt,
+  }
 }
 
 // ─── การจัดกลุ่มตาม Status ────────────────────────────────────────────────────

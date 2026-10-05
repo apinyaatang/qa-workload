@@ -6,11 +6,13 @@ import {
 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { epicDb, syncEpicsFromAdo, calcEpicTestDate } from '../../lib/epicDb'
+import { extraTaskDb } from '../../lib/extraTaskDb'
 import { dateTone, toneClass, localIsoDate, utcDateFromIso } from '../../utils/epicDateTone'
-import { epicToProjects, stripBuzzebees, isActiveEpic, isDeployedEpic } from '../../utils/epicMapping'
+import { epicToProjects, extraTaskToEpic, normalizeState, stripBuzzebees, isActiveEpic, isDeployedEpic } from '../../utils/epicMapping'
 import { addWorkingDaysH } from '../../utils/workingDayUtils'
 import TesterGanttView from '../planning/TesterGanttView'
 import type { Epic, AzureDevOpsConfig } from '../../types/epic'
+import type { ExtraTask } from '../../types/extraTask'
 import type { Employee } from '../../types'
 import { ADO_CONFIG_KEY } from '../../types/epic'
 
@@ -32,6 +34,8 @@ function isDelayPlan(e: Epic, todayIso: string): boolean {
   if (isDeployedEpic(e)) return false
   return !!e.testDate && e.testDate <= todayIso && (e.testingPercent ?? 0) === 0
 }
+
+const EXTRA_INACTIVE = new Set(['deployed', 'go-live commercial', 'on hold', 'retired'])
 
 // ─── Portal dropdown ──────────────────────────────────────────────────────────
 
@@ -731,7 +735,7 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
               return (
                 <tr key={epic.id} className={`${rowBg} hover:bg-blue-50/30 dark:hover:bg-slate-700/40 transition-colors`}>
                   {vis('no')         && <td className={`${tdBase} text-center text-gray-400 text-[11px]`}>{idx + 1}</td>}
-                  {vis('epicNo')     && <td className={`${tdBase} font-mono`}>{(() => { const url = adoItemUrl(epic.epicNo); return url ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{epic.epicNo}</a> : <span className="text-blue-700 dark:text-blue-300">{epic.epicNo}</span> })()}</td>}
+                  {vis('epicNo')     && <td className={`${tdBase} font-mono`}>{epic.epicNo === 0 ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-sans">Extra</span> : (() => { const url = adoItemUrl(epic.epicNo); return url ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{epic.epicNo}</a> : <span className="text-blue-700 dark:text-blue-300">{epic.epicNo}</span> })()}</td>}
                   {vis('iteration')  && <td className={tdBase}><span className="block truncate text-xs" title={epic.iteration}>{stripBuzzebees(epic.iteration) || '—'}</span></td>}
                   {vis('project')    && <td className={tdBase}><span className="block truncate text-xs" title={epic.project}>{stripBuzzebees(epic.project) || '—'}</span></td>}
                   {vis('feature')    && <td className={tdBase}><span className="block truncate font-medium text-xs" title={epic.feature}>{epic.feature || '—'}</span></td>}
@@ -739,30 +743,40 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
                   {vis('state')      && <td className={tdBase}><span className="text-xs truncate block">{epic.state || '—'}</span></td>}
                   {vis('testOwner')  && (
                     <td className={tdBase}>
-                      <PortalSelect value={epic.testOwner} options={['Unassigned', ...empNames]} placeholder="— Test Owner —" onChange={v => onSave(epic.id, { testOwner: v })} minWidth={180} />
+                      {epic.epicNo === 0
+                        ? <span className="text-xs text-gray-700 dark:text-slate-200">{epic.testOwner || '—'}</span>
+                        : <PortalSelect value={epic.testOwner} options={['Unassigned', ...empNames]} placeholder="— Test Owner —" onChange={v => onSave(epic.id, { testOwner: v })} minWidth={180} />}
                     </td>
                   )}
                   {vis('buddy1') && (
                     <td className={tdBase}>
-                      <PortalSelect value={epic.buddy1} options={['Unassigned', ...empNames]} placeholder="— Buddy 1 —" onChange={v => onSave(epic.id, { buddy1: v })} minWidth={180} />
+                      {epic.epicNo === 0
+                        ? <span className="text-xs text-gray-400">—</span>
+                        : <PortalSelect value={epic.buddy1} options={['Unassigned', ...empNames]} placeholder="— Buddy 1 —" onChange={v => onSave(epic.id, { buddy1: v })} minWidth={180} />}
                     </td>
                   )}
                   {vis('buddy2') && (
                     <td className={tdBase}>
-                      <PortalSelect value={epic.buddy2} options={['Unassigned', ...empNames]} placeholder="— Buddy 2 —" onChange={v => onSave(epic.id, { buddy2: v })} minWidth={180} />
+                      {epic.epicNo === 0
+                        ? <span className="text-xs text-gray-400">—</span>
+                        : <PortalSelect value={epic.buddy2} options={['Unassigned', ...empNames]} placeholder="— Buddy 2 —" onChange={v => onSave(epic.id, { buddy2: v })} minWidth={180} />}
                     </td>
                   )}
                   {vis('buddy3') && (
                     <td className={tdBase}>
-                      <PortalSelect value={epic.buddy3} options={['Unassigned', ...empNames]} placeholder="— Buddy 3 —" onChange={v => onSave(epic.id, { buddy3: v })} minWidth={180} />
+                      {epic.epicNo === 0
+                        ? <span className="text-xs text-gray-400">—</span>
+                        : <PortalSelect value={epic.buddy3} options={['Unassigned', ...empNames]} placeholder="— Buddy 3 —" onChange={v => onSave(epic.id, { buddy3: v })} minWidth={180} />}
                     </td>
                   )}
                   {vis('testLead')   && (
                     <td className={tdBase}>
-                      <PortalSelect value={epic.testLead} options={['Unassigned', ...testLeadOptions]} placeholder="— Test Lead —" onChange={v => onSave(epic.id, { testLead: v })} minWidth={200} />
+                      {epic.epicNo === 0
+                        ? <span className="text-xs text-gray-400">—</span>
+                        : <PortalSelect value={epic.testLead} options={['Unassigned', ...testLeadOptions]} placeholder="— Test Lead —" onChange={v => onSave(epic.id, { testLead: v })} minWidth={200} />}
                     </td>
                   )}
-                  {vis('estDay')     && <td className={`${tdBase} text-center`}><InlineNumber id={epic.id} value={epic.testEstimateDay} field="testEstimateDay" unit="d" min={0} onSave={onSave} /></td>}
+                  {vis('estDay')     && <td className={`${tdBase} text-center`}>{epic.epicNo === 0 ? <span className="text-xs">{epic.testEstimateDay ?? '—'}</span> : <InlineNumber id={epic.id} value={epic.testEstimateDay} field="testEstimateDay" unit="d" min={0} onSave={onSave} />}</td>}
                   {/* Test / UAT / Target ใช้เกณฑ์สีเดียวกัน — SIT ไม่อยู่ในเกณฑ์ */}
                   {vis('testDate')   && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(dateTone(epic.testDate, todayIso, warnUntilIso))}`}>{fmt(epic.testDate)}</span></td>}
                   {vis('sitDate')    && <td className={`${tdBase} whitespace-nowrap text-xs`}>{fmt(epic.sitDate)}</td>}
@@ -776,7 +790,9 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
                             style={{ width: `${Math.min(100, epic.testingPercent)}%` }} />
                         </div>
                       )}
-                      <InlineNumber id={epic.id} value={epic.testingPercent} field="testingPercent" unit="%" min={0} max={100} onSave={onSave} />
+                      {epic.epicNo === 0
+                        ? <span className="text-xs">{epic.testingPercent != null ? `${epic.testingPercent}%` : '—'}</span>
+                        : <InlineNumber id={epic.id} value={epic.testingPercent} field="testingPercent" unit="%" min={0} max={100} onSave={onSave} />}
                     </td>
                   )}
                   {vis('testerFlag') && (
@@ -819,6 +835,7 @@ export default function EpicView() {
   , [employees])
 
   const [epics,       setEpics]       = useState<Epic[]>([])
+  const [extraTasks,  setExtraTasks]  = useState<ExtraTask[]>([])
   const [testerFlags, setTesterFlags] = useState<string[]>([])
   const [loading,     setLoading]     = useState(true)
   const [error,       setError]       = useState<string | null>(null)
@@ -875,11 +892,13 @@ export default function EpicView() {
   const load = useCallback(async () => {
     setLoading(true); setError(null)
     try {
-      const [data, { planningDb }] = await Promise.all([
+      const [data, tasks, { planningDb }] = await Promise.all([
         epicDb.getAll(),
+        extraTaskDb.getAll(),
         import('../../lib/planningDb'),
       ])
       setEpics(data)
+      setExtraTasks(tasks)
       const flags = await planningDb.getTesterFlags()
       setTesterFlags(flags)
     } catch (e: any) {
@@ -1061,8 +1080,21 @@ export default function EpicView() {
     [mainEpics],
   )
 
+  // Extra Tasks ที่มี status active (ไม่รวม Deployed, Go-live Commercial, On hold, Retired)
+  const activeExtraTaskEpics = useMemo(
+    () => extraTasks
+      .filter(t => !EXTRA_INACTIVE.has(normalizeState(t.status)))
+      .map(t => extraTaskToEpic(t, holidaySet)),
+    [extraTasks, holidaySet],
+  )
+
+  const allTableEpics = useMemo(
+    () => [...tableEpics, ...activeExtraTaskEpics],
+    [tableEpics, activeExtraTaskEpics],
+  )
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const tableRows  = useMemo(() => applySort(applyFilters(tableEpics)), [tableEpics, search, filterOwners, filterAssignees, filterStates, filterTestLeads, filterIter, filterUatFrom, filterUatTo, filterTargetFrom, filterTargetTo, sort])
+  const tableRows  = useMemo(() => applySort(applyFilters(allTableEpics)), [allTableEpics, search, filterOwners, filterAssignees, filterStates, filterTestLeads, filterIter, filterUatFrom, filterUatTo, filterTargetFrom, filterTargetTo, sort])
   // Gantt ต่อยอดจาก tableRows ตรงๆ เพื่อการันตีว่าเห็นชุดเดียวกับตารางเสมอ
   // ถ้าแยกไปกรองเองซ้ำ สองแท็บจะเพี้ยนจากกันทันทีที่มีคนเพิ่ม filter ใหม่
   const ganttRows  = useMemo(() => tableRows.flatMap(epicToProjects), [tableRows])
@@ -1103,8 +1135,8 @@ export default function EpicView() {
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
         {/* Tab bar */}
         <div className="flex items-end gap-1 px-4 pt-2 border-b border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700/50">
-          <TabBtn active={tab === 'table'}    onClick={() => setTab('table')}    label="Epic Table"    count={loading ? undefined : tableEpics.length} />
-          <TabBtn active={tab === 'gantt'}    onClick={() => setTab('gantt')}    label="Gantt View"    count={loading ? undefined : tableEpics.length} />
+          <TabBtn active={tab === 'table'}    onClick={() => setTab('table')}    label="Epic Table"    count={loading ? undefined : allTableEpics.length} />
+          <TabBtn active={tab === 'gantt'}    onClick={() => setTab('gantt')}    label="Gantt View"    count={loading ? undefined : allTableEpics.length} />
           <TabBtn active={tab === 'deployed'} onClick={() => setTab('deployed')} label="Deployed"      count={loading ? undefined : deployedEpics.length} />
           <TabBtn active={tab === 'delayplan'} onClick={() => setTab('delayplan')} label="Delay Plan"  count={loading ? undefined : delayEpics.length} />
           <TabBtn active={tab === 'noplan'}      onClick={() => setTab('noplan')}      label="No Plan"          count={loading ? undefined : noPlanEpics.length} />
