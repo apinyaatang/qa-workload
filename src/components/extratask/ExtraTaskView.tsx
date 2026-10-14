@@ -325,10 +325,10 @@ const TYPE_COLOR: Record<string, string> = {
 // ── Add modal (for new rows only) ─────────────────────────────────────────────
 
 interface FormState {
-  tester: string; projectName: string; type: string; status: string
+  tester: string; testLead: string; projectName: string; type: string; status: string
   goLiveDate: string; testingPercent: string; testEstimateDay: string; remark: string
 }
-const EMPTY_FORM: FormState = { tester: '', projectName: '', type: '', status: '', goLiveDate: '', testingPercent: '', testEstimateDay: '', remark: '' }
+const EMPTY_FORM: FormState = { tester: '', testLead: '', projectName: '', type: '', status: '', goLiveDate: '', testingPercent: '', testEstimateDay: '', remark: '' }
 
 function AddModal({ employees, onSave, onClose }: {
   employees: { id: string; name: string }[]
@@ -375,10 +375,16 @@ function AddModal({ employees, onSave, onClose }: {
               <PortalSelect value={form.tester} options={employees.map(e => e.name)} placeholder="— เลือก Tester —" onChange={v => set('tester', v)} className={dc} />
             </div>
             <div>
+              <label className={lc}>Test Lead</label>
+              <PortalSelect value={form.testLead} options={employees.map(e => e.name)} placeholder="— เลือก Test Lead —" onChange={v => set('testLead', v)} className={dc} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
               <label className={lc}>Type</label>
               <PortalSelect value={form.type} options={EXTRA_TASK_TYPES} placeholder="— เลือก Type —" onChange={v => set('type', v)} className={dc} />
             </div>
-          </div>
+            <div /></div>
           <div>
             <label className={lc}>Status</label>
             <PortalSelect value={form.status} options={ALL_STATUSES} placeholder="— เลือก Status —" onChange={v => set('status', v)} className={dc} minWidth={400} />
@@ -455,6 +461,7 @@ export default function ExtraTaskView() {
     setSavingIds(prev => new Set([...prev, id]))
     const fields: Record<string, unknown> = {}
     if ('tester'          in patch) fields.tester            = patch.tester          ?? null
+    if ('testLead'        in patch) fields.test_lead         = patch.testLead        ?? ''
     if ('projectName'     in patch) fields.project_name      = patch.projectName
     if ('type'            in patch) fields.type              = patch.type            ?? null
     if ('status'          in patch) fields.status            = patch.status          ?? null
@@ -487,7 +494,8 @@ export default function ExtraTaskView() {
     const pct  = form.testingPercent  !== '' ? Number(form.testingPercent)  : null
     const est  = form.testEstimateDay !== '' ? Number(form.testEstimateDay) : null
     const created = await extraTaskDb.insert({
-      tester:          form.tester || null,
+      tester:          form.tester    || null,
+      testLead:        form.testLead  ?? '',
       projectName:     form.projectName.trim(),
       type:            form.type as ExtraTaskType,
       status:          form.status,
@@ -609,6 +617,7 @@ export default function ExtraTaskView() {
                 <th className={thCls} style={{ minWidth: 200 }}>Project Name</th>
                 <th className={thCls} style={{ minWidth: 130 }}>Type</th>
                 <th className={thCls} style={{ minWidth: 150 }}>Tester</th>
+                <th className={thCls} style={{ minWidth: 150 }}>Test Lead</th>
                 <th className={thCls} style={{ minWidth: 200 }}>Status</th>
                 <th className={thCls} style={{ minWidth: 110 }}>Go Live</th>
                 <th className={thCls} style={{ minWidth: 80 }}>Est.(d)</th>
@@ -662,6 +671,17 @@ export default function ExtraTaskView() {
                         employees={activeEmployees}
                         placeholder="— Tester —"
                         onSave={v => autoSave(task.id, { tester: v || null })}
+                        minWidth={180}
+                      />
+                    </td>
+
+                    {/* Test Lead — inline dropdown */}
+                    <td className={tdCls}>
+                      <InlineDropdown
+                        value={task.testLead}
+                        employees={activeEmployees}
+                        placeholder="— Test Lead —"
+                        onSave={v => autoSave(task.id, { testLead: v })}
                         minWidth={180}
                       />
                     </td>

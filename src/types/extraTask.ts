@@ -11,6 +11,7 @@ export type ExtraTaskType = typeof EXTRA_TASK_TYPES[number]
 export interface ExtraTask {
   id: string
   tester:          string | null
+  testLead:        string
   projectName:     string
   type:            ExtraTaskType | string
   status:          string

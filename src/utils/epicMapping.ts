@@ -82,7 +82,7 @@ export function extraTaskToEpic(task: ExtraTask, holidays: Set<string> = new Set
     testerFlag:      task.testerFlag,
     testerNote:      '',
     testEstimateDay: task.testEstimateDay,
-    testLead:        '',
+    testLead:        task.testLead,
     testOwner:       task.tester ?? '',
     buddy1:          '',
     buddy2:          '',

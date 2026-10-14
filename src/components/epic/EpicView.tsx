@@ -743,9 +743,7 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
                   {vis('state')      && <td className={tdBase}><span className="text-xs truncate block">{epic.state || '—'}</span></td>}
                   {vis('testOwner')  && (
                     <td className={tdBase}>
-                      {epic.epicNo === 0
-                        ? <span className="text-xs text-gray-700 dark:text-slate-200">{epic.testOwner || '—'}</span>
-                        : <PortalSelect value={epic.testOwner} options={['Unassigned', ...empNames]} placeholder="— Test Owner —" onChange={v => onSave(epic.id, { testOwner: v })} minWidth={180} />}
+                      <PortalSelect value={epic.testOwner} options={['Unassigned', ...empNames]} placeholder="— Test Owner —" onChange={v => onSave(epic.id, { testOwner: v })} minWidth={180} />
                     </td>
                   )}
                   {vis('buddy1') && (
@@ -771,12 +769,10 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
                   )}
                   {vis('testLead')   && (
                     <td className={tdBase}>
-                      {epic.epicNo === 0
-                        ? <span className="text-xs text-gray-400">—</span>
-                        : <PortalSelect value={epic.testLead} options={['Unassigned', ...testLeadOptions]} placeholder="— Test Lead —" onChange={v => onSave(epic.id, { testLead: v })} minWidth={200} />}
+                      <PortalSelect value={epic.testLead} options={['Unassigned', ...testLeadOptions]} placeholder="— Test Lead —" onChange={v => onSave(epic.id, { testLead: v })} minWidth={200} />
                     </td>
                   )}
-                  {vis('estDay')     && <td className={`${tdBase} text-center`}>{epic.epicNo === 0 ? <span className="text-xs">{epic.testEstimateDay ?? '—'}</span> : <InlineNumber id={epic.id} value={epic.testEstimateDay} field="testEstimateDay" unit="d" min={0} onSave={onSave} />}</td>}
+                  {vis('estDay')     && <td className={`${tdBase} text-center`}><InlineNumber id={epic.id} value={epic.testEstimateDay} field="testEstimateDay" unit="d" min={0} onSave={onSave} /></td>}
                   {/* Test / UAT / Target ใช้เกณฑ์สีเดียวกัน — SIT ไม่อยู่ในเกณฑ์ */}
                   {vis('testDate')   && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(dateTone(epic.testDate, todayIso, warnUntilIso))}`}>{fmt(epic.testDate)}</span></td>}
                   {vis('sitDate')    && <td className={`${tdBase} whitespace-nowrap text-xs`}>{fmt(epic.sitDate)}</td>}
@@ -790,9 +786,7 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
                             style={{ width: `${Math.min(100, epic.testingPercent)}%` }} />
                         </div>
                       )}
-                      {epic.epicNo === 0
-                        ? <span className="text-xs">{epic.testingPercent != null ? `${epic.testingPercent}%` : '—'}</span>
-                        : <InlineNumber id={epic.id} value={epic.testingPercent} field="testingPercent" unit="%" min={0} max={100} onSave={onSave} />}
+                      <InlineNumber id={epic.id} value={epic.testingPercent} field="testingPercent" unit="%" min={0} max={100} onSave={onSave} />
                     </td>
                   )}
                   {vis('testerFlag') && (
@@ -873,8 +867,10 @@ export default function EpicView() {
     if (epicInitialTester) setEpicInitialTester(null)
   }, [epicInitialTester, setEpicInitialTester])
 
-  const epicsRef = useRef<Epic[]>([])
-  useEffect(() => { epicsRef.current = epics }, [epics])
+  const epicsRef      = useRef<Epic[]>([])
+  const extraTasksRef = useRef<ExtraTask[]>([])
+  useEffect(() => { epicsRef.current      = epics      }, [epics])
+  useEffect(() => { extraTasksRef.current = extraTasks }, [extraTasks])
   const today = useMemo(() => new Date(), [])
   // ใช้วันที่ตามเวลาท้องถิ่น ไม่ใช่ toISOString() ซึ่งให้วันตาม UTC
   // ที่ไทย (UTC+7) ช่วงเที่ยงคืนถึง 07:00 UTC ยังเป็นเมื่อวานอยู่
@@ -913,6 +909,40 @@ export default function EpicView() {
   const noteTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   async function autoSave(id: string, patch: Partial<Epic>) {
+    // Route Extra Task saves to extraTaskDb
+    const extraTask = extraTasksRef.current.find(t => t.id === id)
+    if (extraTask) {
+      const taskPatch: Partial<ExtraTask> = {}
+      if ('testOwner'       in patch) taskPatch.tester          = patch.testOwner ?? null
+      if ('testLead'        in patch) taskPatch.testLead        = patch.testLead  ?? ''
+      if ('testEstimateDay' in patch) taskPatch.testEstimateDay = patch.testEstimateDay
+      if ('testingPercent'  in patch) taskPatch.testingPercent  = patch.testingPercent
+      setExtraTasks(prev => prev.map(t => t.id === id ? { ...t, ...taskPatch } : t))
+      setSavingIds(prev => new Set([...prev, id]))
+      const fields: Record<string, unknown> = {}
+      if ('tester'          in taskPatch) fields.tester            = taskPatch.tester          ?? null
+      if ('testLead'        in taskPatch) fields.test_lead         = taskPatch.testLead         ?? ''
+      if ('testEstimateDay' in taskPatch) fields.test_estimate_day = taskPatch.testEstimateDay  ?? null
+      if ('testingPercent'  in taskPatch) fields.testing_percent   = taskPatch.testingPercent   ?? null
+      try {
+        const result = await extraTaskDb.updateFieldsChecked(id, fields, extraTask.updatedAt)
+        if (result.ok) {
+          setExtraTasks(prev => prev.map(t => t.id === id ? { ...t, updatedAt: result.updatedAt } : t))
+          setConflictMsg(null)
+        } else if (result.reason === 'conflict') {
+          setConflictMsg('⚠️ ข้อมูลถูกแก้ไขโดยผู้ใช้อื่น — กรุณากด Refresh')
+          await load()
+        } else {
+          setConflictMsg('บันทึกไม่สำเร็จ กรุณาลองใหม่')
+        }
+      } catch {
+        setConflictMsg('บันทึกไม่สำเร็จ กรุณาลองใหม่')
+      } finally {
+        setSavingIds(prev => { const s = new Set(prev); s.delete(id); return s })
+      }
+      return
+    }
+
     const epic = epicsRef.current.find(e => e.id === id)
     if (!epic) return
 

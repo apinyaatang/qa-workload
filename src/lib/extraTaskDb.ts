@@ -15,6 +15,7 @@ function fromRow(r: any): ExtraTask {
   return {
     id:              r.id,
     tester:          r.tester              ?? null,
+    testLead:        r.test_lead           ?? '',
     projectName:     r.project_name        ?? '',
     type:            r.type                ?? '',
     status:          r.status              ?? '',
@@ -42,6 +43,7 @@ export const extraTaskDb = {
   async insert(task: Omit<ExtraTask, 'id' | 'createdAt' | 'updatedAt'>): Promise<ExtraTask> {
     const payload: Record<string, unknown> = {
       tester:            task.tester            ?? null,
+      test_lead:         task.testLead          ?? '',
       project_name:      task.projectName,
       type:              task.type              ?? null,
       status:            task.status            ?? null,
