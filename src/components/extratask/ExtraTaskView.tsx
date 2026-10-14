@@ -298,19 +298,6 @@ function TesterFlagInline({ selected, masterFlags, onSave }: {
 
 // ── TestingBar ─────────────────────────────────────────────────────────────────
 
-function TestingBar({ pct }: { pct: number | null }) {
-  if (pct == null) return null
-  const color = pct >= 100 ? 'bg-green-500' : pct >= 50 ? 'bg-blue-400' : 'bg-orange-400'
-  const tc    = pct >= 100 ? 'text-green-600 dark:text-green-400' : pct >= 50 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-500 dark:text-orange-400'
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className="w-14 h-1.5 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(100, pct)}%` }} />
-      </div>
-      <span className={`text-[11px] font-semibold ${tc}`}>{pct}%</span>
-    </div>
-  )
-}
 
 // ── TYPE badge ─────────────────────────────────────────────────────────────────
 
@@ -720,19 +707,22 @@ export default function ExtraTaskView() {
                       />
                     </td>
 
-                    {/* Testing % — inline number + bar */}
+                    {/* Testing % — editable inline + bar (bar is visual only, InlineNumber is the click target) */}
                     <td className={tdCls}>
-                      <div className="flex items-center gap-2">
-                        <TestingBar pct={task.testingPercent} />
-                        <InlineNumber
-                          value={task.testingPercent}
-                          placeholder="—"
-                          unit="%"
-                          min={0}
-                          max={100}
-                          onSave={v => autoSave(task.id, { testingPercent: v })}
-                        />
-                      </div>
+                      <InlineNumber
+                        value={task.testingPercent}
+                        placeholder="คลิกเพื่อแก้ไข"
+                        unit="%"
+                        min={0}
+                        max={100}
+                        onSave={v => autoSave(task.id, { testingPercent: v })}
+                      />
+                      {task.testingPercent != null && (
+                        <div className="w-full h-1 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden mt-0.5">
+                          <div className={`h-full rounded-full ${task.testingPercent >= 100 ? 'bg-green-500' : task.testingPercent >= 50 ? 'bg-blue-400' : 'bg-orange-400'}`}
+                            style={{ width: `${Math.min(100, task.testingPercent)}%` }} />
+                        </div>
+                      )}
                     </td>
 
                     {/* Tester Flag — multi-select portal */}
