@@ -330,8 +330,9 @@ interface FormState {
 }
 const EMPTY_FORM: FormState = { tester: '', testLead: '', projectName: '', type: '', status: '', goLiveDate: '', testingPercent: '', testEstimateDay: '', remark: '' }
 
-function AddModal({ employees, onSave, onClose }: {
+function AddModal({ employees, testLeadNames, onSave, onClose }: {
   employees: { id: string; name: string }[]
+  testLeadNames: string[]
   onSave: (form: FormState) => Promise<void>
   onClose: () => void
 }) {
@@ -376,7 +377,7 @@ function AddModal({ employees, onSave, onClose }: {
             </div>
             <div>
               <label className={lc}>Test Lead</label>
-              <PortalSelect value={form.testLead} options={employees.map(e => e.name)} placeholder="— เลือก Test Lead —" onChange={v => set('testLead', v)} className={dc} />
+              <PortalSelect value={form.testLead} options={testLeadNames} placeholder="— เลือก Test Lead —" onChange={v => set('testLead', v)} className={dc} minWidth={300} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -424,6 +425,9 @@ function AddModal({ employees, onSave, onClose }: {
 export default function ExtraTaskView() {
   const { employees } = useApp()
   const activeEmployees = employees.filter(e => e.isActive).map(e => ({ id: e.id, name: `${e.firstName} ${e.lastName}`.trim() }))
+  const testLeadNames   = employees
+    .filter(e => e.isActive !== false && (e.position === 'QA Manager' || e.position === 'QA Lead'))
+    .map(e => `${e.firstName} ${e.lastName}${e.nickname ? ` (${e.nickname})` : ''}`.trim())
 
   const [tasks,        setTasks]        = useState<ExtraTask[]>([])
   const [testerFlags,  setTesterFlags]  = useState<string[]>([])
@@ -679,10 +683,10 @@ export default function ExtraTaskView() {
                     <td className={tdCls}>
                       <InlineDropdown
                         value={task.testLead}
-                        employees={activeEmployees}
+                        options={testLeadNames}
                         placeholder="— Test Lead —"
                         onSave={v => autoSave(task.id, { testLead: v })}
-                        minWidth={180}
+                        minWidth={200}
                       />
                     </td>
 
@@ -776,6 +780,7 @@ export default function ExtraTaskView() {
       {showAdd && (
         <AddModal
           employees={activeEmployees}
+          testLeadNames={testLeadNames}
           onSave={handleAdd}
           onClose={() => setShowAdd(false)}
         />
