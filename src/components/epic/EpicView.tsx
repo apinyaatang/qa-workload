@@ -31,11 +31,11 @@ function fmt(iso: string | null | undefined): string {
 // นิยามอยู่ใน utils/epicMapping.ts เพราะหน้า Monitor and Assign ใช้ชุดเดียวกัน
 
 function isDelayPlan(e: Epic, todayIso: string): boolean {
-  if (isDeployedEpic(e)) return false
   return !!e.testDate && e.testDate <= todayIso && (e.testingPercent ?? 0) === 0
 }
 
-const EXTRA_INACTIVE = new Set(['deployed', 'go-live commercial', 'on hold', 'retired'])
+const EXTRA_INACTIVE   = new Set(['deployed', 'go-live commercial', 'on hold', 'retired'])
+const DELAY_EXCLUDED   = new Set(['retired', 'on hold'])
 
 // ─── Portal dropdown ──────────────────────────────────────────────────────────
 
@@ -1091,12 +1091,13 @@ export default function EpicView() {
   const mainEpics     = useMemo(() => epics.filter(e => !isDeployedEpic(e)), [epics])
   const deployedEpics = useMemo(() => epics.filter(e => isDeployedEpic(e)), [epics])
   const delayEpics    = useMemo(
-    () => mainEpics.filter(e =>
+    () => epics.filter(e =>
+      !DELAY_EXCLUDED.has(e.state.trim().toLowerCase()) &&
       isDelayPlan(e, todayIso) &&
       e.testOwner !== 'Unassigned' &&
       e.testLead  !== 'Unassigned'
     ),
-    [mainEpics, todayIso],
+    [epics, todayIso],
   )
   const noPlanEpics      = useMemo(() => mainEpics.filter(e => !e.uatDate && !e.targetDate), [mainEpics])
   const unassignedEpics  = useMemo(
