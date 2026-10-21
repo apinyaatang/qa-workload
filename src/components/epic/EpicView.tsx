@@ -1090,7 +1090,14 @@ export default function EpicView() {
 
   const mainEpics     = useMemo(() => epics.filter(e => !isDeployedEpic(e)), [epics])
   const deployedEpics = useMemo(() => epics.filter(e => isDeployedEpic(e)), [epics])
-  const delayEpics    = useMemo(() => mainEpics.filter(e => isDelayPlan(e, todayIso)), [mainEpics, todayIso])
+  const delayEpics    = useMemo(
+    () => mainEpics.filter(e =>
+      isDelayPlan(e, todayIso) &&
+      e.testOwner !== 'Unassigned' &&
+      e.testLead  !== 'Unassigned'
+    ),
+    [mainEpics, todayIso],
+  )
   const noPlanEpics      = useMemo(() => mainEpics.filter(e => !e.uatDate && !e.targetDate), [mainEpics])
   const unassignedEpics  = useMemo(
     () => mainEpics.filter(isActiveEpic).filter(e => e.testOwner === 'Unassigned' || e.testLead === 'Unassigned'),
