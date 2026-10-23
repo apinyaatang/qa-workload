@@ -1101,6 +1101,7 @@ export default function EpicView() {
   const delayEpics    = useMemo(
     () => epics.filter(e =>
       !DELAY_EXCLUDED.has(e.state.trim().toLowerCase()) &&
+      !e.testerFlag.includes('Deployed') &&
       isDelayPlan(e, todayIso) &&
       e.testOwner !== 'Unassigned' &&
       e.testLead  !== 'Unassigned'
