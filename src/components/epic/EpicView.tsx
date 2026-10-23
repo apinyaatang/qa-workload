@@ -35,7 +35,7 @@ function isDelayPlan(e: Epic, todayIso: string): boolean {
 }
 
 const EXTRA_INACTIVE   = new Set(['deployed', 'go-live commercial', 'on hold', 'retired'])
-const DELAY_EXCLUDED   = new Set(['retired', 'on hold'])
+const DELAY_EXCLUDED   = new Set(['retired', 'on hold', 'go-live commercial', 'deployed'])
 
 // ─── Portal dropdown ──────────────────────────────────────────────────────────
 
