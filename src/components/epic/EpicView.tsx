@@ -858,6 +858,11 @@ export default function EpicView() {
   const [filterTargetFrom,  setFilterTargetFrom]  = useState('')
   const [filterTargetTo,    setFilterTargetTo]    = useState('')
 
+  // Delay Plan filters
+  const [filterDelayProject, setFilterDelayProject] = useState<string[]>([])
+  const [filterDelayOwner,   setFilterDelayOwner]   = useState<string[]>([])
+  const [filterDelayLead,    setFilterDelayLead]     = useState<string[]>([])
+
   // Sort
   const [sort, setSort] = useState<{ field: SortField; dir: 'asc' | 'desc' }>({ field: 'epicNo', dir: 'asc' })
 
@@ -1137,7 +1142,17 @@ export default function EpicView() {
   // ถ้าแยกไปกรองเองซ้ำ สองแท็บจะเพี้ยนจากกันทันทีที่มีคนเพิ่ม filter ใหม่
   const ganttRows  = useMemo(() => tableRows.flatMap(epicToProjects), [tableRows])
   const deployRows  = useMemo(() => applySort(deployedEpics), [deployedEpics, sort])
-  const delayRows   = useMemo(() => applySort(delayEpics), [delayEpics, sort])
+  const delayProjectOptions = useMemo(
+    () => [...new Set(delayEpics.map(e => stripBuzzebees(e.project)).filter(Boolean))].sort(),
+    [delayEpics],
+  )
+  const delayRows   = useMemo(() => {
+    let list = delayEpics
+    if (filterDelayProject.length) list = list.filter(e => filterDelayProject.includes(stripBuzzebees(e.project)))
+    if (filterDelayOwner.length)   list = list.filter(e => filterDelayOwner.includes(e.testOwner))
+    if (filterDelayLead.length)    list = list.filter(e => filterDelayLead.includes(e.testLead))
+    return applySort(list)
+  }, [delayEpics, filterDelayProject, filterDelayOwner, filterDelayLead, sort])
   const noPlanRows       = useMemo(() => applySort(noPlanEpics), [noPlanEpics, sort])
   const unassignedRows   = useMemo(() => applySort(unassignedEpics), [unassignedEpics, sort])
 
@@ -1293,6 +1308,22 @@ export default function EpicView() {
               <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 text-amber-700 dark:text-amber-300 text-xs">
                 <AlertTriangle size={13} />
                 Epic ที่ Testing Date &lt;= วันนี้ และ Testing % = 0
+              </div>
+              {/* Delay Plan filters */}
+              <div className="flex flex-wrap gap-2 items-center mb-3">
+                <MultiSelect value={filterDelayProject} options={delayProjectOptions} placeholder="ทุก Project"
+                  onChange={setFilterDelayProject} minWidth={180} />
+                <MultiSelect value={filterDelayOwner} options={['Unassigned', ...activeEmployees.map(e => e.name)]} placeholder="ทุก Test Owner"
+                  onChange={setFilterDelayOwner} minWidth={160} />
+                <MultiSelect value={filterDelayLead} options={['Unassigned', ...testLeadOptions]} placeholder="ทุก Test Lead"
+                  onChange={setFilterDelayLead} minWidth={160} />
+                {(filterDelayProject.length > 0 || filterDelayOwner.length > 0 || filterDelayLead.length > 0) && (
+                  <button onClick={() => { setFilterDelayProject([]); setFilterDelayOwner([]); setFilterDelayLead([]) }}
+                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 transition-colors">
+                    <X size={12} /> ล้าง Filter
+                  </button>
+                )}
+                <span className="ml-auto text-xs text-gray-400 dark:text-slate-500">{delayRows.length} รายการ</span>
               </div>
               <EpicTable
                 rows={delayRows} epics={epics} savingIds={savingIds}
