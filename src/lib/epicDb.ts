@@ -117,6 +117,7 @@ const ADO_FIELDS = [
   'Custom.SITDate',
   'Custom.UATDate',
   'Custom.TypeofEpic',
+  'Custom.TestEstimate',
 ].join(',')
 
 export interface SyncResult {
@@ -197,20 +198,23 @@ export async function syncEpicsFromAdo(
     const sitDate    = adoDateToIso(f['Custom.SITDate'])
 
     const existing = existingMap.get(epicNo)
-    const estDay   = existing?.test_estimate_day ?? null
-    const testDate = calcEpicTestDate(uatDate, targetDate, estDay, holidays)
+    // ถ้า ADO มีค่า Custom.TestEstimate ให้ใช้ค่านั้น ถ้าไม่มีให้คงค่าเดิมใน DB
+    const adoEstRaw = f['Custom.TestEstimate']
+    const estDay    = adoEstRaw != null ? Number(adoEstRaw) || null : (existing?.test_estimate_day ?? null)
+    const testDate  = calcEpicTestDate(uatDate, targetDate, estDay, holidays)
 
     const adoFields = {
-      epic_no:   epicNo,
-      item_type: f['Custom.TypeofEpic'] ?? f['System.WorkItemType'] ?? '',
-      iteration: f['System.IterationPath'] ?? '',
-      project:   f['System.AreaPath']     ?? '',
-      feature:   f['System.Title']        ?? '',
-      state:     f['System.State']        ?? '',
-      sit_date:  sitDate,
-      uat_date:  uatDate,
-      target_date: targetDate,
-      test_date: testDate,
+      epic_no:          epicNo,
+      item_type:        f['Custom.TypeofEpic'] ?? f['System.WorkItemType'] ?? '',
+      iteration:        f['System.IterationPath'] ?? '',
+      project:          f['System.AreaPath']     ?? '',
+      feature:          f['System.Title']        ?? '',
+      state:            f['System.State']        ?? '',
+      sit_date:         sitDate,
+      uat_date:         uatDate,
+      target_date:      targetDate,
+      test_estimate_day: estDay,
+      test_date:        testDate,
     }
 
     try {
@@ -226,7 +230,7 @@ export async function syncEpicsFromAdo(
         // Insert with null defaults for QA fields
         const { error } = await (supabase as any)
           .from('epics')
-          .insert({ ...adoFields, testing_percent: null, tester_flag: null, tester_note: '', test_estimate_day: null, test_lead: '', test_owner: '', buddy1: '', buddy2: '', buddy3: '' })
+          .insert({ ...adoFields, testing_percent: null, tester_flag: null, tester_note: '', test_lead: '', test_owner: '', buddy1: '', buddy2: '', buddy3: '' })
         if (error) { result.errors.push(`Insert epic ${epicNo}: ${error.message}`); continue }
         result.inserted++
       }
