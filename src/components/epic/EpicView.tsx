@@ -863,6 +863,9 @@ export default function EpicView() {
   const [filterDelayOwner,   setFilterDelayOwner]   = useState<string[]>([])
   const [filterDelayLead,    setFilterDelayLead]     = useState<string[]>([])
 
+  // Deployed filter
+  const [filterDeployProject, setFilterDeployProject] = useState<string[]>([])
+
   // Sort
   const [sort, setSort] = useState<{ field: SortField; dir: 'asc' | 'desc' }>({ field: 'epicNo', dir: 'asc' })
 
@@ -1146,7 +1149,15 @@ export default function EpicView() {
   // Gantt ต่อยอดจาก tableRows ตรงๆ เพื่อการันตีว่าเห็นชุดเดียวกับตารางเสมอ
   // ถ้าแยกไปกรองเองซ้ำ สองแท็บจะเพี้ยนจากกันทันทีที่มีคนเพิ่ม filter ใหม่
   const ganttRows  = useMemo(() => tableRows.flatMap(epicToProjects), [tableRows])
-  const deployRows  = useMemo(() => applySort(deployedEpics), [deployedEpics, sort])
+  const deployProjectOptions = useMemo(
+    () => [...new Set(deployedEpics.map(e => stripBuzzebees(e.project)).filter(Boolean))].sort(),
+    [deployedEpics],
+  )
+  const deployRows  = useMemo(() => {
+    let list = deployedEpics
+    if (filterDeployProject.length) list = list.filter(e => filterDeployProject.includes(stripBuzzebees(e.project)))
+    return applySort(list)
+  }, [deployedEpics, filterDeployProject, sort])
   const delayProjectOptions = useMemo(
     () => [...new Set(delayEpics.map(e => stripBuzzebees(e.project)).filter(Boolean))].sort(),
     [delayEpics],
@@ -1302,12 +1313,26 @@ export default function EpicView() {
               today={today}
             />
           ) : tab === 'deployed' ? (
-            <EpicTable
-              rows={deployRows} epics={epics} savingIds={savingIds}
-              employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
-              sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
-              expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
-            />
+            <div>
+              {/* Deployed filter */}
+              <div className="flex flex-wrap gap-2 items-center mb-3">
+                <MultiSelect value={filterDeployProject} options={deployProjectOptions} placeholder="ทุก Project"
+                  onChange={setFilterDeployProject} minWidth={180} />
+                {filterDeployProject.length > 0 && (
+                  <button onClick={() => setFilterDeployProject([])}
+                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 transition-colors">
+                    <X size={12} /> ล้าง Filter
+                  </button>
+                )}
+                <span className="ml-auto text-xs text-gray-400 dark:text-slate-500">{deployRows.length} รายการ</span>
+              </div>
+              <EpicTable
+                rows={deployRows} epics={epics} savingIds={savingIds}
+                employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
+                sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
+                expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
+              />
+            </div>
           ) : tab === 'delayplan' ? (
             <div>
               <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 text-amber-700 dark:text-amber-300 text-xs">
