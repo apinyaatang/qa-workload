@@ -840,6 +840,7 @@ export default function EpicView() {
   const [syncAuthErr, setSyncAuthErr] = useState<string | undefined>(undefined)
   const [syncing,     setSyncing]     = useState(false)
   const [syncMsg,     setSyncMsg]     = useState<string | null>(null)
+  const [syncErrMsg,  setSyncErrMsg]  = useState<string | null>(null)
   const [expanded,    setExpanded]    = useState(false)
 
   // Filters
@@ -1011,7 +1012,7 @@ export default function EpicView() {
 
   // ── Azure DevOps Sync ────────────────────────────────────────────────────────
   async function doSync(cfg: AzureDevOpsConfig) {
-    setSyncing(true); setSyncMsg(null)
+    setSyncing(true); setSyncMsg(null); setSyncErrMsg(null)
     try {
       const result = await syncEpicsFromAdo(cfg, holidaySet)
       const debugPaths = result.samplePaths.length
@@ -1027,10 +1028,9 @@ export default function EpicView() {
     } catch (e: any) {
       const msg: string = e?.message ?? ''
       if (/401|403|unauthorized/i.test(msg)) {
-        setSyncAuthErr('PAT หมดอายุหรือไม่ถูกต้อง — กรุณาอัปเดต PAT ใหม่')
-        setShowSync(true)
+        setSyncErrMsg('PAT หมดอายุหรือไม่ถูกต้อง — กรุณาอัปเดต PAT ใหม่')
       } else {
-        setSyncMsg(`Sync ล้มเหลว: ${msg}`)
+        setSyncErrMsg(`Sync ล้มเหลว: ${msg}`)
       }
     } finally {
       setSyncing(false)
@@ -1050,7 +1050,7 @@ export default function EpicView() {
   }
 
   async function handleSync(cfg: AzureDevOpsConfig) {
-    setShowSync(false); setSyncAuthErr(undefined)
+    setShowSync(false); setSyncAuthErr(undefined); setSyncErrMsg(null)
     await doSync(cfg)
   }
 
@@ -1192,6 +1192,19 @@ export default function EpicView() {
         <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 text-sm">
           <span className="flex-1">{syncMsg}</span>
           <button onClick={() => setSyncMsg(null)}><X size={15} /></button>
+        </div>
+      )}
+      {syncErrMsg && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 text-sm">
+          <AlertCircle size={15} className="shrink-0" />
+          <span className="flex-1">{syncErrMsg}</span>
+          <button
+            onClick={() => { setSyncErrMsg(null); setSyncAuthErr(syncErrMsg ?? undefined); setShowSync(true) }}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-red-600 hover:bg-red-700 text-white whitespace-nowrap"
+          >
+            <CloudDownload size={12} /> Update PAT
+          </button>
+          <button onClick={() => setSyncErrMsg(null)} className="ml-1"><X size={15} /></button>
         </div>
       )}
       {error && (
