@@ -856,8 +856,10 @@ export default function EpicView() {
   const [filterIter,        setFilterIter]        = useState('')
   const [filterUatFrom,     setFilterUatFrom]     = useState('')
   const [filterUatTo,       setFilterUatTo]       = useState('')
-  const [filterTargetFrom,  setFilterTargetFrom]  = useState('')
-  const [filterTargetTo,    setFilterTargetTo]    = useState('')
+  const [filterTargetFrom,   setFilterTargetFrom]  = useState('')
+  const [filterTargetTo,     setFilterTargetTo]    = useState('')
+  const [filterTestDateFrom, setFilterTestDateFrom] = useState('')
+  const [filterTestDateTo,   setFilterTestDateTo]   = useState('')
 
   // Delay Plan filters
   const [filterDelayProject, setFilterDelayProject] = useState<string[]>([])
@@ -1085,15 +1087,18 @@ export default function EpicView() {
       if (filterUatTo      && (e.uatDate    ?? '9999') > filterUatTo)  return false
       if (filterTargetFrom && (e.targetDate ?? '') < filterTargetFrom) return false
       if (filterTargetTo   && (e.targetDate ?? '9999') > filterTargetTo) return false
+      if (filterTestDateFrom && (e.testDate ?? '') < filterTestDateFrom) return false
+      if (filterTestDateTo   && (e.testDate ?? '9999') > filterTestDateTo) return false
       return true
     })
   }
 
-  const hasActiveFilter = !!(search || filterOwners.length || filterAssignees.length || filterStates.length || filterTestLeads.length || filterIter || filterUatFrom || filterUatTo || filterTargetFrom || filterTargetTo)
+  const hasActiveFilter = !!(search || filterOwners.length || filterAssignees.length || filterStates.length || filterTestLeads.length || filterIter || filterUatFrom || filterUatTo || filterTargetFrom || filterTargetTo || filterTestDateFrom || filterTestDateTo)
 
   function clearAllFilters() {
     setSearch(''); setFilterOwners([]); setFilterAssignees([]); setFilterStates([]); setFilterTestLeads([])
     setFilterIter(''); setFilterUatFrom(''); setFilterUatTo(''); setFilterTargetFrom(''); setFilterTargetTo('')
+    setFilterTestDateFrom(''); setFilterTestDateTo('')
   }
 
   const mainEpics     = useMemo(() => epics.filter(e => !isDeployedEpic(e)), [epics])
@@ -1145,7 +1150,7 @@ export default function EpicView() {
   )
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const tableRows  = useMemo(() => applySort(applyFilters(allTableEpics)), [allTableEpics, search, filterOwners, filterAssignees, filterStates, filterTestLeads, filterIter, filterUatFrom, filterUatTo, filterTargetFrom, filterTargetTo, sort])
+  const tableRows  = useMemo(() => applySort(applyFilters(allTableEpics)), [allTableEpics, search, filterOwners, filterAssignees, filterStates, filterTestLeads, filterIter, filterUatFrom, filterUatTo, filterTargetFrom, filterTargetTo, filterTestDateFrom, filterTestDateTo, sort])
   // Gantt ต่อยอดจาก tableRows ตรงๆ เพื่อการันตีว่าเห็นชุดเดียวกับตารางเสมอ
   // ถ้าแยกไปกรองเองซ้ำ สองแท็บจะเพี้ยนจากกันทันทีที่มีคนเพิ่ม filter ใหม่
   const ganttRows  = useMemo(() => tableRows.flatMap(epicToProjects), [tableRows])
@@ -1291,6 +1296,16 @@ export default function EpicView() {
               <span className="text-xs text-gray-400">–</span>
               <input type="date" value={filterTargetTo} onChange={e => setFilterTargetTo(e.target.value)}
                 className="px-2 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+            </div>
+
+            {/* Test Date range */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-medium text-indigo-500 dark:text-indigo-400 whitespace-nowrap">Test Date:</span>
+              <input type="date" value={filterTestDateFrom} onChange={e => setFilterTestDateFrom(e.target.value)}
+                className="px-2 py-1.5 text-xs rounded-lg border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+              <span className="text-xs text-gray-400">–</span>
+              <input type="date" value={filterTestDateTo} onChange={e => setFilterTestDateTo(e.target.value)}
+                className="px-2 py-1.5 text-xs rounded-lg border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
             </div>
 
             {/* Clear + count */}
