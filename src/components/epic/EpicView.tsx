@@ -36,6 +36,16 @@ function isDelayPlan(e: Epic, todayIso: string): boolean {
     && (e.donePercent ?? 0) === 0
 }
 
+/**
+ * สีของ Test Date — เหมือน dateTone แต่ถ้าเลยวันแล้วและมี Testing% หรือ Done% > 0
+ * ถือว่างานเดินอยู่ ไม่แสดงสีแดง (สอดคล้องกับ isDelayPlan)
+ */
+function testDateTone(e: Epic, todayIso: string, warnUntilIso: string) {
+  const tone = dateTone(e.testDate, todayIso, warnUntilIso)
+  if (tone === 'red' && ((e.testingPercent ?? 0) > 0 || (e.donePercent ?? 0) > 0)) return null
+  return tone
+}
+
 function PctCell({ value, barClass }: { value: number | null; barClass: string }) {
   if (value == null) return <span className="text-xs text-gray-300 dark:text-slate-600">—</span>
   return (
@@ -798,7 +808,7 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
                   )}
                   {vis('estDay')     && <td className={`${tdBase} text-center`}><InlineNumber id={epic.id} value={epic.testEstimateDay} field="testEstimateDay" unit="d" min={0} onSave={onSave} /></td>}
                   {/* Test / UAT / Target ใช้เกณฑ์สีเดียวกัน — SIT ไม่อยู่ในเกณฑ์ */}
-                  {vis('testDate')   && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(dateTone(epic.testDate, todayIso, warnUntilIso))}`}>{fmt(epic.testDate)}</span></td>}
+                  {vis('testDate')   && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(testDateTone(epic, todayIso, warnUntilIso))}`}>{fmt(epic.testDate)}</span></td>}
                   {vis('sitDate')    && <td className={`${tdBase} whitespace-nowrap text-xs`}>{fmt(epic.sitDate)}</td>}
                   {vis('uatDate')    && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(dateTone(epic.uatDate, todayIso, warnUntilIso))}`}>{fmt(epic.uatDate)}</span></td>}
                   {vis('targetDate') && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(dateTone(epic.targetDate, todayIso, warnUntilIso))}`}>{fmt(epic.targetDate)}</span></td>}

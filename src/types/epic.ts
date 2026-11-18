@@ -26,6 +26,8 @@ export interface Epic {
   qaCount:           number | null
   waitConfirmCount:  number | null
   waitDeployCount:   number | null
+  archivedCount:          number | null  // User Story/Bug ที่ State = Archieved
+  itemsTotalWithArchived: number | null  // ทุก State รวม Archieved ไม่รวม Retired
   itemsSyncedAt:     string | null
   devPercent:        number | null  // dev_count / items_total
   baPercent:         number | null  // ba_count / items_total

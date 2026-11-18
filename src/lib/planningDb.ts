@@ -5,7 +5,7 @@ export const FALLBACK_TESTER_FLAGS = [
   'Delay from Other team', 'Follow up plan', 'Wait confirm', 'Can be postpone',
   'No need Tester', 'Wait kickoff', 'Follow Feature', 'Testcase', 'On going',
   'Test on plan', 'Test delay', 'Testing hold', 'Support UAT', 'Test Done',
-  'Deployed', 'Support PRD',
+  'Deployed', 'Support PRD', 'Recheck',
 ]
 
 function parseTesterFlag(raw: unknown): string[] {

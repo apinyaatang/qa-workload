@@ -22,6 +22,18 @@ export function calcEpicTestDate(
 
 export const PROGRESS_RETENTION_DAYS = 30
 
+/**
+ * Tester Flag อัตโนมัติจากจำนวน Archieved
+ *   Archieved = Total (Total > 0)  → ['Deployed']
+ *   0 < Archieved < Total          → ['Recheck']
+ *   Archieved = 0 / ไม่มี item     → undefined (ไม่แตะ flag เดิม)
+ * Total ในที่นี้ = User Story + Bug ทุก State รวม Archieved ไม่รวม Retired
+ */
+export function autoTesterFlag(archived: number, totalWithArchived: number): string[] | undefined {
+  if (totalWithArchived <= 0 || archived <= 0) return undefined
+  return archived >= totalWithArchived ? ['Deployed'] : ['Recheck']
+}
+
 function progressPercents(c: { total: number; DEV: number; BA: number; QA: number; WFD: number }) {
   const p = (n: number) => (c.total > 0 ? Math.round((n / c.total) * 100) : null)
   return {
@@ -69,6 +81,8 @@ function fromRow(r: any): Epic {
     qaCount:          r.qa_count           ?? null,
     waitConfirmCount: r.wait_confirm_count ?? null,
     waitDeployCount:  r.wait_deploy_count  ?? null,
+    archivedCount:          r.archived_count            ?? null,
+    itemsTotalWithArchived: r.items_total_with_archived ?? null,
     itemsSyncedAt:    r.items_synced_at    ?? null,
     devPercent:       r.dev_percent  != null ? Number(r.dev_percent)  : null,
     baPercent:        r.ba_percent   != null ? Number(r.ba_percent)   : null,
@@ -322,7 +336,7 @@ export async function syncEpicsFromAdo(
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
         body: JSON.stringify({
-          query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject]='Buzzebees' AND [System.WorkItemType] IN ('User Story','Bug') AND [System.Parent] IN (${parentIds.join(',')}) AND [System.State] NOT IN ('Retired','Archieved')`,
+          query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject]='Buzzebees' AND [System.WorkItemType] IN ('User Story','Bug') AND [System.Parent] IN (${parentIds.join(',')}) AND [System.State] <> 'Retired'`,
         }),
       })
       const itemIds: number[] = itemWiqlRes.ok
@@ -342,10 +356,10 @@ export async function syncEpicsFromAdo(
       result.itemsTotal = allItemDetails.length
 
       // 6e. Count per epic
-      type Counts = { total: number; DEV: number; BA: number; QA: number; WC: number; WFD: number }
+      type Counts = { total: number; DEV: number; BA: number; QA: number; WC: number; WFD: number; archived: number; totalAll: number }
       const epicNosSet = new Set(epicNos)
       const counts = new Map<number, Counts>()
-      for (const epicNo of epicNos) counts.set(epicNo, { total: 0, DEV: 0, BA: 0, QA: 0, WC: 0, WFD: 0 })
+      for (const epicNo of epicNos) counts.set(epicNo, { total: 0, DEV: 0, BA: 0, QA: 0, WC: 0, WFD: 0, archived: 0, totalAll: 0 })
 
       for (const item of allItemDetails) {
         const f = item.fields ?? {}
@@ -354,6 +368,9 @@ export async function syncEpicsFromAdo(
         const epicNo: number | undefined = epicNosSet.has(parent) ? parent : featureParentMap.get(parent)
         if (!epicNo || !counts.has(epicNo)) continue
         const c = counts.get(epicNo)!
+        c.totalAll++
+        // Archieved นับแยก — ไม่รวมใน total ที่ใช้คิด Dev/BA/Testing/Done %
+        if (state === 'Archieved') { c.archived++; continue }
         c.total++
         const bucket = ITEM_BUCKET[state]
         if (bucket === 'DEV') c.DEV++
@@ -374,7 +391,11 @@ export async function syncEpicsFromAdo(
         const dbId = epicNoToId.get(epicNo)
         if (!dbId) continue
         const pct = progressPercents(c)
+        const flag = autoTesterFlag(c.archived, c.totalAll)
         const { error } = await (supabase as any).from('epics').update({
+          archived_count:            c.archived,
+          items_total_with_archived: c.totalAll,
+          ...(flag ? { tester_flag: flag } : {}),
           items_total:        c.total,
           dev_count:          c.DEV,
           ba_count:           c.BA,

@@ -122,6 +122,12 @@ const ITEM_BUCKET = {
 
 const PROGRESS_RETENTION_DAYS = 30
 
+// เหมือน autoTesterFlag ใน src/lib/epicDb.ts — แก้ต้องแก้ทั้งสองที่
+function autoTesterFlag(archived, totalWithArchived) {
+  if (totalWithArchived <= 0 || archived <= 0) return undefined
+  return archived >= totalWithArchived ? ['Deployed'] : ['Recheck']
+}
+
 function progressPercents(c) {
   const p = n => (c.total > 0 ? Math.round((n / c.total) * 100) : null)
   return { dev_percent: p(c.DEV), ba_percent: p(c.BA), testing_percent: p(c.QA), done_percent: p(c.WFD) }
@@ -214,7 +220,7 @@ async function main() {
   // 6c. All items
   const parentIds = [...epicNos, ...featureIds]
   const itemIds = await wiql(
-    `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject]='Buzzebees' AND [System.WorkItemType] IN ('User Story','Bug') AND [System.Parent] IN (${parentIds.join(',')}) AND [System.State] NOT IN ('Retired','Archieved')`
+    `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject]='Buzzebees' AND [System.WorkItemType] IN ('User Story','Bug') AND [System.Parent] IN (${parentIds.join(',')}) AND [System.State] <> 'Retired'`
   )
   console.log(`Found ${itemIds.length} User Stories/Bugs`)
 
@@ -224,7 +230,7 @@ async function main() {
   // 6d. Count per epic
   const epicNosSet = new Set(epicNos)
   const counts = new Map()
-  for (const epicNo of epicNos) counts.set(epicNo, { total: 0, DEV: 0, BA: 0, QA: 0, WC: 0, WFD: 0 })
+  for (const epicNo of epicNos) counts.set(epicNo, { total: 0, DEV: 0, BA: 0, QA: 0, WC: 0, WFD: 0, archived: 0, totalAll: 0 })
 
   for (const item of itemDetails) {
     const f = item.fields ?? {}
@@ -233,6 +239,8 @@ async function main() {
     const epicNo = epicNosSet.has(parent) ? parent : featureParentMap.get(parent)
     if (!epicNo || !counts.has(epicNo)) continue
     const c = counts.get(epicNo)
+    c.totalAll++
+    if (state === 'Archieved') { c.archived++; continue }
     c.total++
     const b = ITEM_BUCKET[state]
     if (b) c[b]++
@@ -248,7 +256,10 @@ async function main() {
     const dbId = epicNoToId.get(epicNo)
     if (!dbId) continue
     const pct = progressPercents(c)
+    const flag = autoTesterFlag(c.archived, c.totalAll)
     const ok = await sbPatch(`epics?id=eq.${dbId}`, {
+      archived_count: c.archived, items_total_with_archived: c.totalAll,
+      ...(flag ? { tester_flag: flag } : {}),
       items_total: c.total, dev_count: c.DEV, ba_count: c.BA,
       qa_count: c.QA, wait_confirm_count: c.WC, wait_deploy_count: c.WFD,
       items_synced_at: syncedAt, ...pct,
