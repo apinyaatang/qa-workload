@@ -636,7 +636,8 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
 
   const vis = (k: ColKey) => !hiddenCols.has(k)
 
-  const thBase = 'px-2 py-2.5 text-left text-[11px] font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide whitespace-nowrap bg-gray-50 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-600 relative select-none overflow-hidden'
+  // sticky แทน relative (ยังเป็น containing block ของ resize handle) · เส้นใต้ใช้ inset shadow เพราะ border ของ th ใน border-collapse ไม่ติดไปกับ sticky
+  const thBase = 'px-2 py-2.5 text-left text-[11px] font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide whitespace-nowrap bg-gray-50 dark:bg-slate-700 shadow-[inset_0_-1px_0_rgb(229_231_235)] dark:shadow-[inset_0_-1px_0_rgb(71_85_105)] sticky top-0 z-20 select-none overflow-hidden'
   const tdBase = 'px-2 py-2 text-xs text-gray-700 dark:text-slate-200 border-b border-gray-100 dark:border-slate-700 align-middle overflow-hidden'
 
   function Th({ colKey, label, sortField, children }: { colKey: ColKey; label?: string; sortField?: SortField | null; children?: React.ReactNode }) {
