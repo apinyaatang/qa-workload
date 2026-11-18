@@ -83,6 +83,9 @@ function fromRow(r: any): Epic {
     waitDeployCount:  r.wait_deploy_count  ?? null,
     archivedCount:          r.archived_count            ?? null,
     itemsTotalWithArchived: r.items_total_with_archived ?? null,
+    archivedPercent: r.archived_count != null && r.items_total_with_archived > 0
+      ? Math.round((r.archived_count / r.items_total_with_archived) * 100)
+      : null,
     itemsSyncedAt:    r.items_synced_at    ?? null,
     devPercent:       r.dev_percent  != null ? Number(r.dev_percent)  : null,
     baPercent:        r.ba_percent   != null ? Number(r.ba_percent)   : null,

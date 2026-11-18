@@ -530,12 +530,14 @@ const COL_DEFS = [
   { key: 'baPct',      label: 'BA %',        sortField: 'baPercent',       hideable: true,  defaultW: 80  },
   { key: 'testingPct', label: 'Testing %',   sortField: 'testingPercent',  hideable: true,  defaultW: 100 },
   { key: 'donePct',    label: 'Done %',      sortField: 'donePercent',     hideable: true,  defaultW: 80  },
+  // แสดงเฉพาะแท็บ Deployed (EpicTable showArchived)
+  { key: 'archivedPct', label: 'Archived %', sortField: 'archivedPercent', hideable: true,  defaultW: 100 },
   { key: 'testerFlag', label: 'Tester Flag', sortField: null,              hideable: true,  defaultW: 190 },
   { key: 'testerNote', label: 'Tester Note', sortField: null,              hideable: true,  defaultW: 190 },
 ] as const
 
 type ColKey = typeof COL_DEFS[number]['key']
-type SortField = 'epicNo' | 'iteration' | 'project' | 'feature' | 'itemType' | 'state' | 'testOwner' | 'testLead' | 'testEstimateDay' | 'testDate' | 'sitDate' | 'uatDate' | 'targetDate' | 'testingPercent' | 'devPercent' | 'baPercent' | 'donePercent' | 'pmName'
+type SortField = 'epicNo' | 'iteration' | 'project' | 'feature' | 'itemType' | 'state' | 'testOwner' | 'testLead' | 'testEstimateDay' | 'testDate' | 'sitDate' | 'uatDate' | 'targetDate' | 'testingPercent' | 'devPercent' | 'baPercent' | 'donePercent' | 'archivedPercent' | 'pmName'
 
 // Store HIDDEN cols (not visible) so new columns auto-appear without clearing localStorage
 const LS_HIDDEN = 'epic_hidden_cols'
@@ -582,9 +584,12 @@ interface TableProps {
   warnUntilIso: string
   expanded: boolean
   onToggleExpand: () => void
+  /** แสดงคอลัมน์ Archived % — ใช้เฉพาะแท็บ Deployed */
+  showArchived?: boolean
 }
 
-function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, sort, onSort, onSave, today, warnUntilIso, expanded, onToggleExpand }: TableProps) {
+function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, sort, onSort, onSave, today, warnUntilIso, expanded, onToggleExpand, showArchived = false }: TableProps) {
+  const cols = COL_DEFS.filter(c => c.key !== 'archivedPct' || showArchived)
   const todayIso = localIsoDate(today)
   const empNames = employees.map(e => e.name)
 
@@ -644,7 +649,7 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
     document.addEventListener('mouseup',   onUp)
   }
 
-  const vis = (k: ColKey) => !hiddenCols.has(k)
+  const vis = (k: ColKey) => !hiddenCols.has(k) && (k !== 'archivedPct' || showArchived)
 
   // sticky แทน relative (ยังเป็น containing block ของ resize handle) · เส้นใต้ใช้ inset shadow เพราะ border ของ th ใน border-collapse ไม่ติดไปกับ sticky
   const thBase = 'px-2 py-2.5 text-left text-[11px] font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide whitespace-nowrap bg-gray-50 dark:bg-slate-700 shadow-[inset_0_-1px_0_rgb(229_231_235)] dark:shadow-[inset_0_-1px_0_rgb(71_85_105)] sticky top-0 z-20 select-none overflow-hidden'
@@ -673,8 +678,8 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
     )
   }
 
-  const hideableCount = COL_DEFS.filter(c => c.hideable).length
-  const visCount = hideableCount - COL_DEFS.filter(c => c.hideable && hiddenCols.has(c.key)).length
+  const hideableCount = cols.filter(c => c.hideable).length
+  const visCount = hideableCount - cols.filter(c => c.hideable && hiddenCols.has(c.key)).length
 
   return (
     <div>
@@ -694,10 +699,10 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
               <div className="flex gap-1">
                 <button onClick={() => setHiddenCols(new Set())} className="text-[10px] text-indigo-500 hover:underline">ทั้งหมด</button>
                 <span className="text-gray-300">·</span>
-                <button onClick={() => setHiddenCols(new Set(COL_DEFS.filter(c => c.hideable).map(c => c.key)))} className="text-[10px] text-gray-400 hover:underline">ซ่อนทั้งหมด</button>
+                <button onClick={() => setHiddenCols(new Set(cols.filter(c => c.hideable).map(c => c.key)))} className="text-[10px] text-gray-400 hover:underline">ซ่อนทั้งหมด</button>
               </div>
             </div>
-            {COL_DEFS.filter(c => c.hideable).map(col => (
+            {cols.filter(c => c.hideable).map(col => (
               <label key={col.key} className="flex items-center gap-2 py-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 rounded px-1">
                 <input type="checkbox" checked={!hiddenCols.has(col.key)}
                   onChange={() => setHiddenCols(prev => {
@@ -721,9 +726,9 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
 
       {/* Table */}
       <div className={`overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm ${expanded ? 'max-h-[calc(100vh-10rem)]' : 'max-h-[calc(100vh-22rem)]'} overflow-y-auto`}>
-        <table className="border-collapse text-sm" style={{ tableLayout: 'fixed', width: COL_DEFS.filter(c => vis(c.key)).reduce((s, c) => s + (colWidths[c.key] ?? c.defaultW), 0) }}>
+        <table className="border-collapse text-sm" style={{ tableLayout: 'fixed', width: cols.filter(c => vis(c.key)).reduce((s, c) => s + (colWidths[c.key] ?? c.defaultW), 0) }}>
           <colgroup>
-            {COL_DEFS.filter(c => vis(c.key)).map(c => (
+            {cols.filter(c => vis(c.key)).map(c => (
               <col key={c.key} style={{ width: colWidths[c.key] ?? c.defaultW }} />
             ))}
           </colgroup>
@@ -751,6 +756,7 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
               {vis('baPct')      && <Th colKey="baPct"      label="BA %"        sortField="baPercent" />}
               {vis('testingPct') && <Th colKey="testingPct" label="Testing %"   sortField="testingPercent" />}
               {vis('donePct')    && <Th colKey="donePct"    label="Done %"      sortField="donePercent" />}
+              {vis('archivedPct') && <Th colKey="archivedPct" label="Archived %" sortField="archivedPercent" />}
               {vis('testerFlag') && <Th colKey="testerFlag" label="Tester Flag" />}
               {vis('testerNote') && <Th colKey="testerNote" label="Tester Note" />}
             </tr>
@@ -832,6 +838,7 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
                     </td>
                   )}
                   {vis('donePct') && <td className={tdBase}><PctCell value={epic.donePercent} barClass="bg-green-500" /></td>}
+                  {vis('archivedPct') && <td className={tdBase}><PctCell value={epic.archivedPercent} barClass="bg-slate-500" /></td>}
                   {vis('testerFlag') && (
                     <td className={tdBase}>
                       <TesterFlagCell selected={epic.testerFlag} masterFlags={testerFlags} onChange={v => onSave(epic.id, { testerFlag: v })} />
@@ -912,6 +919,8 @@ export default function EpicView() {
 
   // Deployed filter
   const [filterDeployProject, setFilterDeployProject] = useState<string[]>([])
+  const [filterDeployPms,     setFilterDeployPms]     = useState<string[]>([])
+  const [filterDeployOwners,  setFilterDeployOwners]  = useState<string[]>([])
 
   // Sort
   const [sort, setSort] = useState<{ field: SortField; dir: 'asc' | 'desc' }>({ field: 'epicNo', dir: 'asc' })
@@ -1207,11 +1216,22 @@ export default function EpicView() {
     () => [...new Set(deployedEpics.map(e => stripBuzzebees(e.project)).filter(Boolean))].sort(),
     [deployedEpics],
   )
+  const deployPmOptions = useMemo(
+    () => [...new Set(deployedEpics.map(e => e.pmName).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [deployedEpics],
+  )
+  const deployOwnerOptions = useMemo(
+    () => [...new Set(deployedEpics.map(e => e.testOwner).filter(o => o && o !== 'Unassigned'))].sort((a, b) => a.localeCompare(b)),
+    [deployedEpics],
+  )
   const deployRows  = useMemo(() => {
     let list = deployedEpics
     if (filterDeployProject.length) list = list.filter(e => filterDeployProject.includes(stripBuzzebees(e.project)))
+    if (filterDeployPms.length)     list = list.filter(e => filterDeployPms.includes(e.pmName ?? ''))
+    if (filterDeployOwners.length)  list = list.filter(e => filterDeployOwners.includes(e.testOwner ?? ''))
     return applySort(list)
-  }, [deployedEpics, filterDeployProject, sort])
+  }, [deployedEpics, filterDeployProject, filterDeployPms, filterDeployOwners, sort])
+  const hasDeployFilter = filterDeployProject.length > 0 || filterDeployPms.length > 0 || filterDeployOwners.length > 0
   const delayProjectOptions = useMemo(
     () => [...new Set(delayEpics.map(e => stripBuzzebees(e.project)).filter(Boolean))].sort(),
     [delayEpics],
@@ -1399,8 +1419,12 @@ export default function EpicView() {
               <div className="flex flex-wrap gap-2 items-center mb-3">
                 <MultiSelect value={filterDeployProject} options={deployProjectOptions} placeholder="ทุก Project"
                   onChange={setFilterDeployProject} minWidth={180} />
-                {filterDeployProject.length > 0 && (
-                  <button onClick={() => setFilterDeployProject([])}
+                <MultiSelect value={filterDeployPms} options={['', ...deployPmOptions]} placeholder="ทุก PM"
+                  onChange={setFilterDeployPms} minWidth={180} />
+                <MultiSelect value={filterDeployOwners} options={['Unassigned', '', ...deployOwnerOptions]} placeholder="ทุก Test Owner"
+                  onChange={setFilterDeployOwners} minWidth={180} />
+                {hasDeployFilter && (
+                  <button onClick={() => { setFilterDeployProject([]); setFilterDeployPms([]); setFilterDeployOwners([]) }}
                     className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 transition-colors">
                     <X size={12} /> ล้าง Filter
                   </button>
@@ -1408,7 +1432,7 @@ export default function EpicView() {
                 <span className="ml-auto text-xs text-gray-400 dark:text-slate-500">{deployRows.length} รายการ</span>
               </div>
               <EpicTable
-                rows={deployRows} epics={epics} savingIds={savingIds}
+                rows={deployRows} epics={epics} savingIds={savingIds} showArchived
                 employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
                 sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
                 expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
