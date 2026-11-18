@@ -84,6 +84,12 @@ function adoDateToIso(raw) {
   return `${y}-${m}-${day}`
 }
 
+function adoPersonName(v) {
+  if (!v) return ''
+  if (typeof v === 'string') return v.trim()
+  return String(v.displayName ?? '').trim()
+}
+
 function getIterationNumber(path) {
   const match = path.match(/(\d+)\s*$/)
   return match ? parseInt(match[1], 10) : 0
@@ -137,7 +143,7 @@ async function main() {
   const ADO_FIELDS = [
     'System.Id', 'System.Title', 'System.State', 'System.AreaPath', 'System.IterationPath',
     'System.WorkItemType', 'Microsoft.VSTS.Scheduling.TargetDate',
-    'Custom.SITDate', 'Custom.UATDate', 'Custom.TypeofEpic', 'Custom.TestEstimate',
+    'Custom.SITDate', 'Custom.UATDate', 'Custom.TypeofEpic', 'Custom.TestEstimate', 'Custom.PMName',
   ]
   const allItems = await fetchItems(allIds, ADO_FIELDS)
 
@@ -169,6 +175,7 @@ async function main() {
       project: f['System.AreaPath'] ?? '',
       feature: f['System.Title'] ?? '',
       state: f['System.State'] ?? '',
+      pm_name: adoPersonName(f['Custom.PMName']),
       sit_date: sitDate, uat_date: uatDate, target_date: targetDate,
       test_estimate_day: estDay, test_date: testDate,
     }

@@ -505,6 +505,7 @@ const COL_DEFS = [
   { key: 'feature',    label: 'Feature',     sortField: null,              hideable: true,  defaultW: 230 },
   { key: 'type',       label: 'Type',        sortField: null,              hideable: true,  defaultW: 80  },
   { key: 'state',      label: 'State',       sortField: 'state',           hideable: true,  defaultW: 110 },
+  { key: 'pmName',     label: 'PM Name',     sortField: 'pmName',          hideable: true,  defaultW: 170 },
   { key: 'testOwner',  label: 'Test Owner',  sortField: 'testOwner',       hideable: true,  defaultW: 170 },
   { key: 'buddy1',     label: 'Buddy 1',     sortField: null,              hideable: true,  defaultW: 170 },
   { key: 'buddy2',     label: 'Buddy 2',     sortField: null,              hideable: true,  defaultW: 170 },
@@ -524,7 +525,7 @@ const COL_DEFS = [
 ] as const
 
 type ColKey = typeof COL_DEFS[number]['key']
-type SortField = 'epicNo' | 'iteration' | 'project' | 'feature' | 'itemType' | 'state' | 'testOwner' | 'testLead' | 'testEstimateDay' | 'testDate' | 'sitDate' | 'uatDate' | 'targetDate' | 'testingPercent' | 'devPercent' | 'baPercent' | 'donePercent'
+type SortField = 'epicNo' | 'iteration' | 'project' | 'feature' | 'itemType' | 'state' | 'testOwner' | 'testLead' | 'testEstimateDay' | 'testDate' | 'sitDate' | 'uatDate' | 'targetDate' | 'testingPercent' | 'devPercent' | 'baPercent' | 'donePercent' | 'pmName'
 
 // Store HIDDEN cols (not visible) so new columns auto-appear without clearing localStorage
 const LS_HIDDEN = 'epic_hidden_cols'
@@ -724,6 +725,7 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
               {vis('feature')    && <Th colKey="feature"    label="Feature"     sortField="feature" />}
               {vis('type')       && <Th colKey="type"       label="Type"        sortField="itemType" />}
               {vis('state')      && <Th colKey="state"      label="State"       sortField="state" />}
+              {vis('pmName')     && <Th colKey="pmName"     label="PM Name"     sortField="pmName" />}
               {vis('testOwner')  && <Th colKey="testOwner"  label="Test Owner"  sortField="testOwner" />}
               {vis('buddy1')     && <Th colKey="buddy1"     label="Buddy 1" />}
               {vis('buddy2')     && <Th colKey="buddy2"     label="Buddy 2" />}
@@ -761,6 +763,7 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
                   {vis('feature')    && <td className={tdBase}><span className="block truncate font-medium text-xs" title={epic.feature}>{epic.feature || '—'}</span></td>}
                   {vis('type')       && <td className={tdBase}><span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 truncate block">{epic.itemType || '—'}</span></td>}
                   {vis('state')      && <td className={tdBase}><span className="text-xs truncate block">{epic.state || '—'}</span></td>}
+                  {vis('pmName')     && <td className={tdBase}><span className="text-xs truncate block" title={epic.pmName}>{epic.pmName || '—'}</span></td>}
                   {vis('testOwner')  && (
                     <td className={tdBase}>
                       <PortalSelect value={epic.testOwner} options={['Unassigned', ...empNames]} placeholder="— Test Owner —" onChange={v => onSave(epic.id, { testOwner: v })} minWidth={180} />
@@ -877,6 +880,7 @@ export default function EpicView() {
   const [filterOwners,      setFilterOwners]      = useState<string[]>([])
   const [filterStates,      setFilterStates]      = useState<string[]>([])
   const [filterTestLeads,   setFilterTestLeads]   = useState<string[]>([])
+  const [filterPms,         setFilterPms]         = useState<string[]>([])
   // Assignee Workload: กรองทุกคนที่เป็น testOwner หรือ buddy1/2/3
   // มาจากการคลิก "ดู Epic ของคนนี้" ในหน้า Monitor and Assign
   const [filterAssignees,   setFilterAssignees]   = useState<string[]>(
@@ -1107,6 +1111,7 @@ export default function EpicView() {
       if (filterOwners.length    && !filterOwners.includes(e.testOwner))  return false
       if (filterStates.length    && !filterStates.includes(e.state))      return false
       if (filterTestLeads.length && !filterTestLeads.includes(e.testLead)) return false
+      if (filterPms.length       && !filterPms.includes(e.pmName))         return false
       if (filterAssignees.length) {
         const assigned = [e.testOwner, e.buddy1, e.buddy2, e.buddy3]
         if (!filterAssignees.some(a => assigned.includes(a))) return false
@@ -1122,12 +1127,12 @@ export default function EpicView() {
     })
   }
 
-  const hasActiveFilter = !!(search || filterOwners.length || filterAssignees.length || filterStates.length || filterTestLeads.length || filterIter || filterUatFrom || filterUatTo || filterTargetFrom || filterTargetTo || filterTestDateFrom || filterTestDateTo)
+  const hasActiveFilter = !!(search || filterOwners.length || filterAssignees.length || filterStates.length || filterTestLeads.length || filterPms.length || filterIter || filterUatFrom || filterUatTo || filterTargetFrom || filterTargetTo || filterTestDateFrom || filterTestDateTo)
 
   function clearAllFilters() {
     setSearch(''); setFilterOwners([]); setFilterAssignees([]); setFilterStates([]); setFilterTestLeads([])
     setFilterIter(''); setFilterUatFrom(''); setFilterUatTo(''); setFilterTargetFrom(''); setFilterTargetTo('')
-    setFilterTestDateFrom(''); setFilterTestDateTo('')
+    setFilterTestDateFrom(''); setFilterTestDateTo(''); setFilterPms([])
   }
 
   const mainEpics     = useMemo(() => epics.filter(e => !isDeployedEpic(e)), [epics])
@@ -1179,10 +1184,14 @@ export default function EpicView() {
   )
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const tableRows  = useMemo(() => applySort(applyFilters(allTableEpics)), [allTableEpics, search, filterOwners, filterAssignees, filterStates, filterTestLeads, filterIter, filterUatFrom, filterUatTo, filterTargetFrom, filterTargetTo, filterTestDateFrom, filterTestDateTo, sort])
+  const tableRows  = useMemo(() => applySort(applyFilters(allTableEpics)), [allTableEpics, search, filterOwners, filterAssignees, filterStates, filterTestLeads, filterPms, filterIter, filterUatFrom, filterUatTo, filterTargetFrom, filterTargetTo, filterTestDateFrom, filterTestDateTo, sort])
   // Gantt ต่อยอดจาก tableRows ตรงๆ เพื่อการันตีว่าเห็นชุดเดียวกับตารางเสมอ
   // ถ้าแยกไปกรองเองซ้ำ สองแท็บจะเพี้ยนจากกันทันทีที่มีคนเพิ่ม filter ใหม่
   const ganttRows  = useMemo(() => tableRows.flatMap(epicToProjects), [tableRows])
+  const pmOptions = useMemo(
+    () => [...new Set(epics.map(e => e.pmName).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [epics],
+  )
   const deployProjectOptions = useMemo(
     () => [...new Set(deployedEpics.map(e => stripBuzzebees(e.project)).filter(Boolean))].sort(),
     [deployedEpics],
@@ -1299,6 +1308,10 @@ export default function EpicView() {
             {/* Test Lead multi-select */}
             <MultiSelect value={filterTestLeads} options={['Unassigned', '', ...testLeadOptions]} placeholder="ทุก Test Lead"
               onChange={setFilterTestLeads} minWidth={148} />
+
+            {/* PM Name multi-select — '' = Epic ที่ยังไม่มี PM */}
+            <MultiSelect value={filterPms} options={['', ...pmOptions]} placeholder="ทุก PM"
+              onChange={setFilterPms} minWidth={148} />
 
             {/* Iteration single select */}
             <select value={filterIter} onChange={e => setFilterIter(e.target.value)}

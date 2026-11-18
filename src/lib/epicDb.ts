@@ -49,6 +49,7 @@ function fromRow(r: any): Epic {
     project:         r.project          ?? '',
     feature:         r.feature          ?? '',
     state:           r.state            ?? '',
+    pmName:          r.pm_name          ?? '',
     sitDate:         r.sit_date         ?? null,
     uatDate:         r.uat_date         ?? null,
     targetDate:      r.target_date      ?? null,
@@ -128,6 +129,13 @@ function adoDateToIso(raw: string | null | undefined): string | null {
   return `${y}-${m}-${day}`
 }
 
+// Custom.PMName มาเป็น string แต่ถ้าวันหนึ่งถูกเปลี่ยนเป็น Identity field จะมาเป็น object
+function adoPersonName(v: unknown): string {
+  if (!v) return ''
+  if (typeof v === 'string') return v.trim()
+  return String((v as { displayName?: string }).displayName ?? '').trim()
+}
+
 const ADO_FIELDS = [
   'System.Id',
   'System.Title',
@@ -140,6 +148,7 @@ const ADO_FIELDS = [
   'Custom.UATDate',
   'Custom.TypeofEpic',
   'Custom.TestEstimate',
+  'Custom.PMName',
 ].join(',')
 
 export interface SyncResult {
@@ -243,6 +252,7 @@ export async function syncEpicsFromAdo(
       project:          f['System.AreaPath']     ?? '',
       feature:          f['System.Title']        ?? '',
       state:            f['System.State']        ?? '',
+      pm_name:          adoPersonName(f['Custom.PMName']),
       sit_date:         sitDate,
       uat_date:         uatDate,
       target_date:      targetDate,

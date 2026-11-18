@@ -6,6 +6,7 @@ export interface Epic {
   project:         string        // System.AreaPath
   feature:         string        // System.Title
   state:           string        // System.State
+  pmName:          string        // Custom.PMName
   sitDate:         string | null // Custom.SITDate
   uatDate:         string | null // Custom.UATDate
   targetDate:      string | null // Microsoft.VSTS.Scheduling.TargetDate
