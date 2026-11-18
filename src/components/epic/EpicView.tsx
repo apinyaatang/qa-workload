@@ -31,7 +31,21 @@ function fmt(iso: string | null | undefined): string {
 // นิยามอยู่ใน utils/epicMapping.ts เพราะหน้า Monitor and Assign ใช้ชุดเดียวกัน
 
 function isDelayPlan(e: Epic, todayIso: string): boolean {
-  return !!e.testDate && e.testDate <= todayIso && (e.testingPercent ?? 0) === 0
+  return !!e.testDate && e.testDate <= todayIso
+    && (e.testingPercent ?? 0) === 0
+    && (e.donePercent ?? 0) === 0
+}
+
+function PctCell({ value, barClass }: { value: number | null; barClass: string }) {
+  if (value == null) return <span className="text-xs text-gray-300 dark:text-slate-600">—</span>
+  return (
+    <div className="min-w-[48px]">
+      <div className="w-full h-1 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden mb-0.5">
+        <div className={`h-full rounded-full ${barClass}`} style={{ width: `${Math.min(100, value)}%` }} />
+      </div>
+      <span className="text-xs tabular-nums text-gray-700 dark:text-slate-200">{value}%</span>
+    </div>
+  )
 }
 
 const EXTRA_INACTIVE   = new Set(['deployed', 'go-live commercial', 'on hold', 'retired'])
@@ -501,13 +515,16 @@ const COL_DEFS = [
   { key: 'sitDate',    label: 'SIT Date',    sortField: null,              hideable: true,  defaultW: 100 },
   { key: 'uatDate',    label: 'UAT Date',    sortField: 'uatDate',         hideable: true,  defaultW: 100 },
   { key: 'targetDate', label: 'Target Date', sortField: 'targetDate',      hideable: true,  defaultW: 100 },
+  { key: 'devPct',     label: 'Dev %',       sortField: 'devPercent',      hideable: true,  defaultW: 80  },
+  { key: 'baPct',      label: 'BA %',        sortField: 'baPercent',       hideable: true,  defaultW: 80  },
   { key: 'testingPct', label: 'Testing %',   sortField: 'testingPercent',  hideable: true,  defaultW: 100 },
+  { key: 'donePct',    label: 'Done %',      sortField: 'donePercent',     hideable: true,  defaultW: 80  },
   { key: 'testerFlag', label: 'Tester Flag', sortField: null,              hideable: true,  defaultW: 190 },
   { key: 'testerNote', label: 'Tester Note', sortField: null,              hideable: true,  defaultW: 190 },
 ] as const
 
 type ColKey = typeof COL_DEFS[number]['key']
-type SortField = 'epicNo' | 'iteration' | 'project' | 'feature' | 'itemType' | 'state' | 'testOwner' | 'testLead' | 'testEstimateDay' | 'testDate' | 'sitDate' | 'uatDate' | 'targetDate' | 'testingPercent'
+type SortField = 'epicNo' | 'iteration' | 'project' | 'feature' | 'itemType' | 'state' | 'testOwner' | 'testLead' | 'testEstimateDay' | 'testDate' | 'sitDate' | 'uatDate' | 'targetDate' | 'testingPercent' | 'devPercent' | 'baPercent' | 'donePercent'
 
 // Store HIDDEN cols (not visible) so new columns auto-appear without clearing localStorage
 const LS_HIDDEN = 'epic_hidden_cols'
@@ -717,7 +734,10 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
               {vis('sitDate')    && <Th colKey="sitDate"    label="SIT Date"    sortField="sitDate" />}
               {vis('uatDate')    && <Th colKey="uatDate"    label="UAT Date"    sortField="uatDate" />}
               {vis('targetDate') && <Th colKey="targetDate" label="Target Date" sortField="targetDate" />}
+              {vis('devPct')     && <Th colKey="devPct"     label="Dev %"       sortField="devPercent" />}
+              {vis('baPct')      && <Th colKey="baPct"      label="BA %"        sortField="baPercent" />}
               {vis('testingPct') && <Th colKey="testingPct" label="Testing %"   sortField="testingPercent" />}
+              {vis('donePct')    && <Th colKey="donePct"    label="Done %"      sortField="donePercent" />}
               {vis('testerFlag') && <Th colKey="testerFlag" label="Tester Flag" />}
               {vis('testerNote') && <Th colKey="testerNote" label="Tester Note" />}
             </tr>
@@ -778,17 +798,26 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
                   {vis('sitDate')    && <td className={`${tdBase} whitespace-nowrap text-xs`}>{fmt(epic.sitDate)}</td>}
                   {vis('uatDate')    && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(dateTone(epic.uatDate, todayIso, warnUntilIso))}`}>{fmt(epic.uatDate)}</span></td>}
                   {vis('targetDate') && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(dateTone(epic.targetDate, todayIso, warnUntilIso))}`}>{fmt(epic.targetDate)}</span></td>}
+                  {vis('devPct') && <td className={tdBase}><PctCell value={epic.devPercent} barClass="bg-indigo-400" /></td>}
+                  {vis('baPct')  && <td className={tdBase}><PctCell value={epic.baPercent}  barClass="bg-amber-400" /></td>}
                   {vis('testingPct') && (
                     <td className={tdBase}>
-                      {epic.testingPercent != null && (
-                        <div className="w-full h-1 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden mb-0.5">
-                          <div className={`h-full rounded-full ${epic.testingPercent >= 100 ? 'bg-green-500' : epic.testingPercent >= 50 ? 'bg-blue-400' : 'bg-orange-400'}`}
-                            style={{ width: `${Math.min(100, epic.testingPercent)}%` }} />
-                        </div>
+                      {/* Epic: คำนวณจาก Sync (qa_count / items_total) แก้มือไม่ได้ · Extra Task: ยังกรอกมือ */}
+                      {epic.epicNo === 0 ? (
+                        <>
+                          {epic.testingPercent != null && (
+                            <div className="w-full h-1 rounded-full bg-gray-200 dark:bg-slate-600 overflow-hidden mb-0.5">
+                              <div className="h-full rounded-full bg-sky-400" style={{ width: `${Math.min(100, epic.testingPercent)}%` }} />
+                            </div>
+                          )}
+                          <InlineNumber id={epic.id} value={epic.testingPercent} field="testingPercent" unit="%" min={0} max={100} onSave={onSave} />
+                        </>
+                      ) : (
+                        <PctCell value={epic.testingPercent} barClass="bg-sky-400" />
                       )}
-                      <InlineNumber id={epic.id} value={epic.testingPercent} field="testingPercent" unit="%" min={0} max={100} onSave={onSave} />
                     </td>
                   )}
+                  {vis('donePct') && <td className={tdBase}><PctCell value={epic.donePercent} barClass="bg-green-500" /></td>}
                   {vis('testerFlag') && (
                     <td className={tdBase}>
                       <TesterFlagCell selected={epic.testerFlag} masterFlags={testerFlags} onChange={v => onSave(epic.id, { testerFlag: v })} />

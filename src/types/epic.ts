@@ -26,6 +26,9 @@ export interface Epic {
   waitConfirmCount:  number | null
   waitDeployCount:   number | null
   itemsSyncedAt:     string | null
+  devPercent:        number | null  // dev_count / items_total
+  baPercent:         number | null  // ba_count / items_total
+  donePercent:       number | null  // wait_deploy_count / items_total
   createdAt:       string
   updatedAt:       string
 }

@@ -114,6 +114,13 @@ const ITEM_BUCKET = {
   'Wait for deploy': 'WFD',
 }
 
+const PROGRESS_RETENTION_DAYS = 30
+
+function progressPercents(c) {
+  const p = n => (c.total > 0 ? Math.round((n / c.total) * 100) : null)
+  return { dev_percent: p(c.DEV), ba_percent: p(c.BA), testing_percent: p(c.QA), done_percent: p(c.WFD) }
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
   console.log(`[${new Date().toISOString()}] Starting ADO sync...`)
@@ -228,17 +235,35 @@ async function main() {
   const refreshed = await sbGet('epics?select=id,epic_no&limit=10000')
   const epicNoToId = new Map(refreshed.map(r => [r.epic_no, r.id]))
   const syncedAt = new Date().toISOString()
+  const history = []
 
   for (const [epicNo, c] of counts) {
     const dbId = epicNoToId.get(epicNo)
     if (!dbId) continue
+    const pct = progressPercents(c)
     const ok = await sbPatch(`epics?id=eq.${dbId}`, {
       items_total: c.total, dev_count: c.DEV, ba_count: c.BA,
       qa_count: c.QA, wait_confirm_count: c.WC, wait_deploy_count: c.WFD,
-      items_synced_at: syncedAt,
+      items_synced_at: syncedAt, ...pct,
     })
     if (ok) result.itemsUpdated++
+    history.push({
+      epic_no: epicNo, items_total: c.total, dev_count: c.DEV, ba_count: c.BA,
+      qa_count: c.QA, wait_confirm_count: c.WC, wait_deploy_count: c.WFD,
+      synced_at: syncedAt, ...pct,
+    })
   }
+
+  // 6f. บันทึกประวัติ แล้วลบของที่เก่ากว่า 30 วัน
+  for (let i = 0; i < history.length; i += 500) {
+    if (!(await sbPost('epic_progress', history.slice(i, i + 500)))) result.errors.push('epic_progress insert failed')
+  }
+  const cutoff = new Date(Date.now() - PROGRESS_RETENTION_DAYS * 86_400_000).toISOString()
+  const purge = await fetch(`${SUPABASE_URL}/rest/v1/epic_progress?synced_at=lt.${encodeURIComponent(cutoff)}`, {
+    method: 'DELETE', headers: SB_HEADERS,
+  })
+  if (!purge.ok) result.errors.push(`epic_progress purge failed: ${purge.status}`)
+  console.log(`History: +${history.length} rows, purged rows older than ${PROGRESS_RETENTION_DAYS} days`)
 
   console.log(`Item counts updated: ${result.itemsUpdated} Epics (${result.itemsTotal} items)`)
   if (result.errors.length) console.error(`Errors (${result.errors.length}): ${result.errors.slice(0, 5).join('; ')}`)

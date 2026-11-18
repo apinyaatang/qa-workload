@@ -20,6 +20,18 @@ export function calcEpicTestDate(
   return d.toISOString().slice(0, 10)
 }
 
+export const PROGRESS_RETENTION_DAYS = 30
+
+function progressPercents(c: { total: number; DEV: number; BA: number; QA: number; WFD: number }) {
+  const p = (n: number) => (c.total > 0 ? Math.round((n / c.total) * 100) : null)
+  return {
+    dev_percent:     p(c.DEV),
+    ba_percent:      p(c.BA),
+    testing_percent: p(c.QA),
+    done_percent:    p(c.WFD),
+  }
+}
+
 // ─── Row mapper ────────────────────────────────────────────────────────────────
 
 function fromRow(r: any): Epic {
@@ -57,6 +69,9 @@ function fromRow(r: any): Epic {
     waitConfirmCount: r.wait_confirm_count ?? null,
     waitDeployCount:  r.wait_deploy_count  ?? null,
     itemsSyncedAt:    r.items_synced_at    ?? null,
+    devPercent:       r.dev_percent  != null ? Number(r.dev_percent)  : null,
+    baPercent:        r.ba_percent   != null ? Number(r.ba_percent)   : null,
+    donePercent:      r.done_percent != null ? Number(r.done_percent) : null,
     createdAt:       r.created_at,
     updatedAt:       r.updated_at,
   }
@@ -343,10 +358,12 @@ export async function syncEpicsFromAdo(
         .from('epics').select('id, epic_no').in('epic_no', epicNos)
       const epicNoToId = new Map<number, string>((epicRows ?? []).map((r: any) => [r.epic_no, r.id]))
       const syncedAt = new Date().toISOString()
+      const history: Record<string, unknown>[] = []
 
       for (const [epicNo, c] of counts) {
         const dbId = epicNoToId.get(epicNo)
         if (!dbId) continue
+        const pct = progressPercents(c)
         const { error } = await (supabase as any).from('epics').update({
           items_total:        c.total,
           dev_count:          c.DEV,
@@ -355,9 +372,24 @@ export async function syncEpicsFromAdo(
           wait_confirm_count: c.WC,
           wait_deploy_count:  c.WFD,
           items_synced_at:    syncedAt,
+          ...pct,
         }).eq('id', dbId)
         if (!error) result.itemsUpdated++
+        history.push({
+          epic_no: epicNo, items_total: c.total, dev_count: c.DEV, ba_count: c.BA,
+          qa_count: c.QA, wait_confirm_count: c.WC, wait_deploy_count: c.WFD,
+          synced_at: syncedAt, ...pct,
+        })
       }
+
+      // 6g. บันทึกประวัติ แล้วลบของที่เก่ากว่า 30 วัน
+      for (let i = 0; i < history.length; i += 500) {
+        const { error } = await (supabase as any).from('epic_progress').insert(history.slice(i, i + 500))
+        if (error) result.errors.push(`epic_progress insert: ${error.message}`)
+      }
+      const cutoff = new Date(Date.now() - PROGRESS_RETENTION_DAYS * 86_400_000).toISOString()
+      const { error: purgeErr } = await (supabase as any).from('epic_progress').delete().lt('synced_at', cutoff)
+      if (purgeErr) result.errors.push(`epic_progress purge: ${purgeErr.message}`)
     } catch (e: any) {
       result.errors.push(`Item counts sync: ${e.message}`)
     }

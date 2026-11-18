@@ -94,6 +94,9 @@ export function extraTaskToEpic(task: ExtraTask, holidays: Set<string> = new Set
     waitConfirmCount: null,
     waitDeployCount:  null,
     itemsSyncedAt:    null,
+    devPercent:       null,
+    baPercent:        null,
+    donePercent:      null,
     createdAt:       task.createdAt,
     updatedAt:       task.updatedAt,
   }
