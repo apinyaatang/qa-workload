@@ -19,6 +19,13 @@ export interface Epic {
   buddy1:          string        // co-tester 1
   buddy2:          string        // co-tester 2
   buddy3:          string        // co-tester 3
+  itemsTotal:        number | null  // synced from ADO
+  devCount:          number | null
+  baCount:           number | null
+  qaCount:           number | null
+  waitConfirmCount:  number | null
+  waitDeployCount:   number | null
+  itemsSyncedAt:     string | null
   createdAt:       string
   updatedAt:       string
 }

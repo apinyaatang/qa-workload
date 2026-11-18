@@ -50,6 +50,13 @@ function fromRow(r: any): Epic {
     buddy1:          r.buddy1           ?? '',
     buddy2:          r.buddy2           ?? '',
     buddy3:          r.buddy3           ?? '',
+    itemsTotal:       r.items_total        ?? null,
+    devCount:         r.dev_count          ?? null,
+    baCount:          r.ba_count           ?? null,
+    qaCount:          r.qa_count           ?? null,
+    waitConfirmCount: r.wait_confirm_count ?? null,
+    waitDeployCount:  r.wait_deploy_count  ?? null,
+    itemsSyncedAt:    r.items_synced_at    ?? null,
     createdAt:       r.created_at,
     updatedAt:       r.updated_at,
   }
@@ -128,6 +135,8 @@ export interface SyncResult {
   totalFromAdo:   number   // all epics before iteration filter
   errors:         string[]
   samplePaths:    string[] // first 3 IterationPath values (for debugging)
+  itemsTotal:     number   // total User Story/Bug items fetched
+  itemsUpdated:   number   // epics whose item counts were saved
 }
 
 export async function syncEpicsFromAdo(
@@ -139,7 +148,16 @@ export async function syncEpicsFromAdo(
   const authHeader = `Basic ${base64Pat}`
   const apiBase    = `${orgUrl.replace(/\/$/, '')}/${encodeURIComponent(project)}/_apis`
 
-  const result: SyncResult = { inserted: 0, updated: 0, skipped: 0, total: 0, totalFromAdo: 0, errors: [], samplePaths: [] }
+  const result: SyncResult = { inserted: 0, updated: 0, skipped: 0, total: 0, totalFromAdo: 0, errors: [], samplePaths: [], itemsTotal: 0, itemsUpdated: 0 }
+
+  // ── Item bucket definitions ──────────────────────────────────────────────────
+  const ITEM_BUCKET: Record<string, string> = {
+    'Ready': 'DEV', 'Development Doing': 'DEV', 'Edit': 'DEV', 'Reject': 'DEV',
+    'Development Done': 'BA', 'BA Check Doing': 'BA', 'Development Reject': 'BA',
+    'BA Check Done': 'QA', 'Testing': 'QA', 'Wait for test STG': 'QA',
+    'Pending': 'WC', 'Waiting confirm': 'WC',
+    'Wait for deploy': 'WFD',
+  }
 
   // ── Step 1: WIQL — get all Epic IDs ─────────────────────────────────────────
   const wiqlRes = await fetch(`${apiBase}/wit/wiql?api-version=7.0`, {
@@ -240,5 +258,110 @@ export async function syncEpicsFromAdo(
   }
 
   result.skipped = result.total - result.inserted - result.updated - result.errors.length
+
+  // ── Step 6: Fetch and sync User Story / Bug counts ───────────────────────────
+  const epicNos = filtered.map(item => item.fields?.['System.Id'] as number).filter(Boolean)
+  if (epicNos.length > 0) {
+    try {
+      // 6a. Get features under these epics
+      const featureWiqlRes = await fetch(`${apiBase}/wit/wiql?api-version=7.0`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+        body: JSON.stringify({
+          query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject]='Buzzebees' AND [System.WorkItemType]='Feature' AND [System.Parent] IN (${epicNos.join(',')})`,
+        }),
+      })
+      const featureData = featureWiqlRes.ok ? await featureWiqlRes.json() : { workItems: [] }
+      const featureIds: number[] = (featureData.workItems ?? []).map((w: any) => w.id).filter(Boolean)
+
+      // 6b. Build feature→epic map (batch fetch feature details)
+      const featureParentMap = new Map<number, number>()
+      if (featureIds.length > 0) {
+        for (let i = 0; i < featureIds.length; i += BATCH) {
+          const batchIds = featureIds.slice(i, i + BATCH).join(',')
+          const r = await fetch(
+            `${apiBase}/wit/workitems?ids=${batchIds}&fields=System.Id,System.Parent&api-version=7.0`,
+            { headers: { Authorization: authHeader } },
+          )
+          if (r.ok) {
+            for (const feat of (await r.json()).value ?? []) {
+              featureParentMap.set(feat.fields?.['System.Id'], feat.fields?.['System.Parent'])
+            }
+          }
+        }
+      }
+
+      // 6c. Bulk WIQL for all User Story/Bug under epics + features
+      const parentIds = [...epicNos, ...featureIds]
+      const itemWiqlRes = await fetch(`${apiBase}/wit/wiql?api-version=7.0`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+        body: JSON.stringify({
+          query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject]='Buzzebees' AND [System.WorkItemType] IN ('User Story','Bug') AND [System.Parent] IN (${parentIds.join(',')}) AND [System.State] NOT IN ('Retired','Archieved')`,
+        }),
+      })
+      const itemIds: number[] = itemWiqlRes.ok
+        ? ((await itemWiqlRes.json()).workItems ?? []).map((w: any) => w.id).filter(Boolean)
+        : []
+
+      // 6d. Batch fetch item details (State + Parent)
+      const allItemDetails: any[] = []
+      for (let i = 0; i < itemIds.length; i += BATCH) {
+        const batchIds = itemIds.slice(i, i + BATCH).join(',')
+        const r = await fetch(
+          `${apiBase}/wit/workitems?ids=${batchIds}&fields=System.State,System.Parent&api-version=7.0`,
+          { headers: { Authorization: authHeader } },
+        )
+        if (r.ok) allItemDetails.push(...((await r.json()).value ?? []))
+      }
+      result.itemsTotal = allItemDetails.length
+
+      // 6e. Count per epic
+      type Counts = { total: number; DEV: number; BA: number; QA: number; WC: number; WFD: number }
+      const epicNosSet = new Set(epicNos)
+      const counts = new Map<number, Counts>()
+      for (const epicNo of epicNos) counts.set(epicNo, { total: 0, DEV: 0, BA: 0, QA: 0, WC: 0, WFD: 0 })
+
+      for (const item of allItemDetails) {
+        const f = item.fields ?? {}
+        const state: string = f['System.State'] ?? ''
+        const parent: number = f['System.Parent']
+        const epicNo: number | undefined = epicNosSet.has(parent) ? parent : featureParentMap.get(parent)
+        if (!epicNo || !counts.has(epicNo)) continue
+        const c = counts.get(epicNo)!
+        c.total++
+        const bucket = ITEM_BUCKET[state]
+        if (bucket === 'DEV') c.DEV++
+        else if (bucket === 'BA') c.BA++
+        else if (bucket === 'QA') c.QA++
+        else if (bucket === 'WC') c.WC++
+        else if (bucket === 'WFD') c.WFD++
+      }
+
+      // 6f. Fetch DB id map (covers newly inserted epics too) and update counts
+      const { data: epicRows } = await (supabase as any)
+        .from('epics').select('id, epic_no').in('epic_no', epicNos)
+      const epicNoToId = new Map<number, string>((epicRows ?? []).map((r: any) => [r.epic_no, r.id]))
+      const syncedAt = new Date().toISOString()
+
+      for (const [epicNo, c] of counts) {
+        const dbId = epicNoToId.get(epicNo)
+        if (!dbId) continue
+        const { error } = await (supabase as any).from('epics').update({
+          items_total:        c.total,
+          dev_count:          c.DEV,
+          ba_count:           c.BA,
+          qa_count:           c.QA,
+          wait_confirm_count: c.WC,
+          wait_deploy_count:  c.WFD,
+          items_synced_at:    syncedAt,
+        }).eq('id', dbId)
+        if (!error) result.itemsUpdated++
+      }
+    } catch (e: any) {
+      result.errors.push(`Item counts sync: ${e.message}`)
+    }
+  }
+
   return result
 }

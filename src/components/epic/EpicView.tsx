@@ -1025,7 +1025,7 @@ export default function EpicView() {
         : result.totalFromAdo === 0
         ? ' ⚠️ ไม่พบ Epic ใน Azure DevOps (ตรวจ Project Name และ PAT)'
         : ` (พบทั้งหมด ${result.totalFromAdo}, ผ่าน filter ${result.total})`
-      setSyncMsg(`Sync เสร็จ: เพิ่ม ${result.inserted} แถว, อัปเดต ${result.updated} แถว${filterNote}${result.errors.length ? ` | error ${result.errors.length}: ${result.errors[0]}` : ''}`)
+      setSyncMsg(`Sync เสร็จ: เพิ่ม ${result.inserted} แถว, อัปเดต ${result.updated} แถว | Item counts: ${result.itemsUpdated} Epics (${result.itemsTotal} items)${filterNote}${result.errors.length ? ` | error ${result.errors.length}: ${result.errors[0]}` : ''}`)
       await load()
     } catch (e: any) {
       const msg: string = e?.message ?? ''

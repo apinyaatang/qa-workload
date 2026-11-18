@@ -1,0 +1,23 @@
+name: Auto Sync ADO → Supabase
+
+on:
+  schedule:
+    - cron: '0 2 * * 1-5'   # 09:00 Bangkok (UTC+7) วันจันทร์–ศุกร์
+  workflow_dispatch:          # กด Run manually ได้ด้วยจากหน้า GitHub Actions
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run ADO sync
+        env:
+          ADO_ORG_URL:       ${{ secrets.ADO_ORG_URL }}
+          ADO_PROJECT:       ${{ secrets.ADO_PROJECT }}
+          ADO_PAT:           ${{ secrets.ADO_PAT }}
+          SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: node scripts/sync-ado.mjs
