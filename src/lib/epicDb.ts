@@ -95,6 +95,14 @@ function fromRow(r: any): Epic {
   }
 }
 
+export interface PrevProgress {
+  devPercent: number | null
+  baPercent: number | null
+  testingPercent: number | null
+  donePercent: number | null
+  syncedAt: string
+}
+
 // ─── DB service ────────────────────────────────────────────────────────────────
 
 export const epicDb = {
@@ -106,6 +114,45 @@ export const epicDb = {
       .order('epic_no', { ascending: true })
     if (error) throw new Error(`[epicDb/getAll] ${error.message}`)
     return (data ?? []).map(fromRow)
+  },
+
+  async getByEpicNo(epicNo: number): Promise<Epic | null> {
+    if (!isConfigured) return null
+    const { data, error } = await (supabase as any).from('epics').select('*').eq('epic_no', epicNo).maybeSingle()
+    if (error) throw new Error(`[epicDb/getByEpicNo] ${error.message}`)
+    return data ? fromRow(data) : null
+  },
+
+  /**
+   * ค่า % ล่าสุดของแต่ละ Epic ก่อนวันนี้ (ตามเวลาท้องถิ่น) จาก epic_progress
+   * ใช้แสดง Movement ▲▼– เทียบกับวันก่อนหน้า
+   */
+  async getPreviousProgress(): Promise<Map<number, PrevProgress>> {
+    const out = new Map<number, PrevProgress>()
+    if (!isConfigured) return out
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+    const PAGE = 1000
+    for (let from = 0; from < 50_000; from += PAGE) {
+      const { data, error } = await (supabase as any)
+        .from('epic_progress')
+        .select('epic_no, dev_percent, ba_percent, testing_percent, done_percent, synced_at')
+        .lt('synced_at', todayStart)
+        .order('synced_at', { ascending: false })
+        .range(from, from + PAGE - 1)
+      if (error || !data) break
+      for (const r of data) {
+        if (out.has(r.epic_no)) continue
+        const num = (v: unknown) => (v != null ? Number(v) : null)
+        out.set(r.epic_no, {
+          devPercent: num(r.dev_percent), baPercent: num(r.ba_percent),
+          testingPercent: num(r.testing_percent), donePercent: num(r.done_percent),
+          syncedAt: r.synced_at,
+        })
+      }
+      if (data.length < PAGE) break
+    }
+    return out
   },
 
   async updateFieldsChecked(
@@ -180,9 +227,14 @@ export interface SyncResult {
   itemsUpdated:   number   // epics whose item counts were saved
 }
 
+/**
+ * @param onlyEpicNo ถ้าระบุ จะ Sync เฉพาะ Epic นั้น (ปุ่ม ↻ รายแถว) — ใช้ตรรกะเดียวกันทุกขั้น
+ *                   และไม่กรองด้วย IterationPath เพราะ Epic อยู่ในตารางอยู่แล้ว
+ */
 export async function syncEpicsFromAdo(
   config: AzureDevOpsConfig,
   holidays: Set<string> = new Set(),
+  onlyEpicNo?: number,
 ): Promise<SyncResult> {
   const { orgUrl, project, pat } = config
   const base64Pat = btoa(`:${pat}`)
@@ -201,6 +253,10 @@ export async function syncEpicsFromAdo(
   }
 
   // ── Step 1: WIQL — get all Epic IDs ─────────────────────────────────────────
+  let allIds: number[]
+  if (onlyEpicNo) {
+    allIds = [onlyEpicNo]
+  } else {
   const wiqlRes = await fetch(`${apiBase}/wit/wiql?api-version=7.0`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: authHeader },
@@ -210,7 +266,8 @@ export async function syncEpicsFromAdo(
   })
   if (!wiqlRes.ok) throw new Error(`WIQL failed: ${wiqlRes.status} ${await wiqlRes.text()}`)
   const wiqlData = await wiqlRes.json()
-  const allIds: number[] = (wiqlData.workItems ?? wiqlData.workItemRelations ?? []).map((w: any) => w.id ?? w.target?.id).filter(Boolean)
+  allIds = (wiqlData.workItems ?? wiqlData.workItemRelations ?? []).map((w: any) => w.id ?? w.target?.id).filter(Boolean)
+  }
   result.totalFromAdo = allIds.length
   if (allIds.length === 0) return result
 
@@ -224,6 +281,7 @@ export async function syncEpicsFromAdo(
       { headers: { Authorization: authHeader } },
     )
     if (!wiRes.ok) {
+      if (onlyEpicNo) throw new Error(`Fetch epic ${onlyEpicNo} failed: ${wiRes.status} ${await wiRes.text()}`)
       result.errors.push(`Batch ${i / BATCH + 1} failed: ${wiRes.status}`)
       continue
     }
@@ -235,7 +293,7 @@ export async function syncEpicsFromAdo(
   result.samplePaths = allItems.slice(0, 5).map(item => item.fields?.['System.IterationPath'] ?? '(no path)')
   const filtered = allItems.filter(item => {
     const path = item.fields?.['System.IterationPath'] ?? ''
-    return getIterationNumber(path) > 230
+    return onlyEpicNo ? true : getIterationNumber(path) > 230
   })
   result.total = filtered.length
 

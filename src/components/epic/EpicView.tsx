@@ -5,7 +5,7 @@ import {
   AlertTriangle, ArrowUp, ArrowDown, Maximize2, Minimize2, SlidersHorizontal,
 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
-import { epicDb, syncEpicsFromAdo, calcEpicTestDate } from '../../lib/epicDb'
+import { epicDb, syncEpicsFromAdo, calcEpicTestDate, type PrevProgress } from '../../lib/epicDb'
 import { extraTaskDb } from '../../lib/extraTaskDb'
 import { dateTone, toneClass, localIsoDate, utcDateFromIso } from '../../utils/epicDateTone'
 import { epicToProjects, extraTaskToEpic, normalizeState, stripBuzzebees, isActiveEpic, isDeployedEpic } from '../../utils/epicMapping'
@@ -46,7 +46,15 @@ function testDateTone(e: Epic, todayIso: string, warnUntilIso: string) {
   return tone
 }
 
-function PctCell({ value, barClass }: { value: number | null; barClass: string }) {
+/** ▲ ▼ – เทียบกับค่าล่าสุดของวันก่อนหน้า (สีเดียวกันหมดตามที่ตกลง) */
+function Movement({ value, prev, prevAt }: { value: number | null; prev?: number | null; prevAt?: string }) {
+  if (value == null || prev == null) return null
+  const sym = value > prev ? '▲' : value < prev ? '▼' : '–'
+  const d = prevAt ? fmt(localIsoDate(new Date(prevAt))) : ''
+  return <span className="ml-1 text-[9px] text-gray-400 dark:text-slate-500 cursor-default" title={`${d}: ${prev}%`}>{sym}</span>
+}
+
+function PctCell({ value, barClass, prev, prevAt }: { value: number | null; barClass: string; prev?: number | null; prevAt?: string }) {
   if (value == null) return <span className="text-xs text-gray-300 dark:text-slate-600">—</span>
   return (
     <div className="min-w-[48px]">
@@ -54,6 +62,7 @@ function PctCell({ value, barClass }: { value: number | null; barClass: string }
         <div className={`h-full rounded-full ${barClass}`} style={{ width: `${Math.min(100, value)}%` }} />
       </div>
       <span className="text-xs tabular-nums text-gray-700 dark:text-slate-200">{value}%</span>
+      <Movement value={value} prev={prev} prevAt={prevAt} />
     </div>
   )
 }
@@ -586,9 +595,13 @@ interface TableProps {
   onToggleExpand: () => void
   /** แสดงคอลัมน์ Archived % — ใช้เฉพาะแท็บ Deployed */
   showArchived?: boolean
+  /** ค่า % ของวันก่อนหน้า — ส่งมาเฉพาะแท็บ Epic Table เพื่อแสดง Movement */
+  prevProgress?: Map<number, PrevProgress>
+  onSyncEpic?: (epicNo: number) => void
+  syncingEpicNos?: Set<number>
 }
 
-function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, sort, onSort, onSave, today, warnUntilIso, expanded, onToggleExpand, showArchived = false }: TableProps) {
+function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, sort, onSort, onSave, today, warnUntilIso, expanded, onToggleExpand, showArchived = false, prevProgress, onSyncEpic, syncingEpicNos }: TableProps) {
   const cols = COL_DEFS.filter(c => c.key !== 'archivedPct' || showArchived)
   const todayIso = localIsoDate(today)
   const empNames = employees.map(e => e.name)
@@ -768,13 +781,20 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
             {rows.map((epic, idx) => {
               const isSaving   = savingIds.has(epic.id)
               const isDelay    = isDelayPlan(epic, todayIso)
+              const prev       = epic.epicNo !== 0 ? prevProgress?.get(epic.epicNo) : undefined
+              const epicSyncing = syncingEpicNos?.has(epic.epicNo) ?? false
               // เดิมมี targetNear (Target ภายใน 7 วัน → ส้ม) ถูกแทนที่ด้วยเกณฑ์สี
               // ชุดใหม่ใน dateTone() ที่ครอบทั้ง Test / UAT / Target พร้อมกัน
               const rowBg      = isSaving ? 'bg-blue-50/40 dark:bg-blue-900/10' : isDelay ? 'bg-amber-50/30 dark:bg-amber-900/10' : 'bg-white dark:bg-slate-800'
               return (
                 <tr key={epic.id} className={`${rowBg} hover:bg-blue-50/30 dark:hover:bg-slate-700/40 transition-colors`}>
                   {vis('no')         && <td className={`${tdBase} text-center text-gray-400 text-[11px]`}>{idx + 1}</td>}
-                  {vis('epicNo')     && <td className={`${tdBase} font-mono`}>{epic.epicNo === 0 ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-sans">Extra</span> : (() => { const url = adoItemUrl(epic.epicNo); return url ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{epic.epicNo}</a> : <span className="text-blue-700 dark:text-blue-300">{epic.epicNo}</span> })()}</td>}
+                  {vis('epicNo')     && <td className={`${tdBase} font-mono`}>{epic.epicNo === 0 ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-sans">Extra</span> : (() => { const url = adoItemUrl(epic.epicNo); return url ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{epic.epicNo}</a> : <span className="text-blue-700 dark:text-blue-300">{epic.epicNo}</span> })()}{epic.epicNo !== 0 && onSyncEpic && (
+                    <button onClick={() => !epicSyncing && onSyncEpic(epic.epicNo)} disabled={epicSyncing} title="Sync Epic นี้จาก ADO"
+                      className="ml-1 align-middle text-gray-300 hover:text-blue-600 dark:text-slate-500 dark:hover:text-blue-400 disabled:cursor-wait">
+                      <RefreshCw size={11} className={epicSyncing ? 'animate-spin text-blue-500' : ''} />
+                    </button>
+                  )}</td>}
                   {vis('iteration')  && <td className={tdBase}><span className="block truncate text-xs" title={epic.iteration}>{stripBuzzebees(epic.iteration) || '—'}</span></td>}
                   {vis('project')    && <td className={tdBase}><span className="block truncate text-xs" title={epic.project}>{stripBuzzebees(epic.project) || '—'}</span></td>}
                   {vis('feature')    && <td className={tdBase}><span className="block truncate font-medium text-xs" title={epic.feature}>{epic.feature || '—'}</span></td>}
@@ -818,8 +838,8 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
                   {vis('sitDate')    && <td className={`${tdBase} whitespace-nowrap text-xs`}>{fmt(epic.sitDate)}</td>}
                   {vis('uatDate')    && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(dateTone(epic.uatDate, todayIso, warnUntilIso))}`}>{fmt(epic.uatDate)}</span></td>}
                   {vis('targetDate') && <td className={`${tdBase} whitespace-nowrap`}><span className={`text-xs ${toneClass(dateTone(epic.targetDate, todayIso, warnUntilIso))}`}>{fmt(epic.targetDate)}</span></td>}
-                  {vis('devPct') && <td className={tdBase}><PctCell value={epic.devPercent} barClass="bg-indigo-400" /></td>}
-                  {vis('baPct')  && <td className={tdBase}><PctCell value={epic.baPercent}  barClass="bg-amber-400" /></td>}
+                  {vis('devPct') && <td className={tdBase}><PctCell value={epic.devPercent} barClass="bg-indigo-400" prev={prev?.devPercent} prevAt={prev?.syncedAt} /></td>}
+                  {vis('baPct')  && <td className={tdBase}><PctCell value={epic.baPercent}  barClass="bg-amber-400" prev={prev?.baPercent} prevAt={prev?.syncedAt} /></td>}
                   {vis('testingPct') && (
                     <td className={tdBase}>
                       {/* Epic: คำนวณจาก Sync (qa_count / items_total) แก้มือไม่ได้ · Extra Task: ยังกรอกมือ */}
@@ -833,11 +853,11 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
                           <InlineNumber id={epic.id} value={epic.testingPercent} field="testingPercent" unit="%" min={0} max={100} onSave={onSave} />
                         </>
                       ) : (
-                        <PctCell value={epic.testingPercent} barClass="bg-sky-400" />
+                        <PctCell value={epic.testingPercent} barClass="bg-sky-400" prev={prev?.testingPercent} prevAt={prev?.syncedAt} />
                       )}
                     </td>
                   )}
-                  {vis('donePct') && <td className={tdBase}><PctCell value={epic.donePercent} barClass="bg-green-500" /></td>}
+                  {vis('donePct') && <td className={tdBase}><PctCell value={epic.donePercent} barClass="bg-green-500" prev={prev?.donePercent} prevAt={prev?.syncedAt} /></td>}
                   {vis('archivedPct') && <td className={tdBase}><PctCell value={epic.archivedPercent} barClass="bg-slate-500" /></td>}
                   {vis('testerFlag') && (
                     <td className={tdBase}>
@@ -919,6 +939,8 @@ export default function EpicView() {
 
   // Deployed filter
   const [filterDeployProject, setFilterDeployProject] = useState<string[]>([])
+  const [prevProgress,   setPrevProgress]   = useState<Map<number, PrevProgress>>(new Map())
+  const [syncingEpicNos, setSyncingEpicNos] = useState<Set<number>>(new Set())
   const [filterDeployPms,     setFilterDeployPms]     = useState<string[]>([])
   const [filterDeployOwners,  setFilterDeployOwners]  = useState<string[]>([])
 
@@ -959,6 +981,7 @@ export default function EpicView() {
       ])
       setEpics(data)
       setExtraTasks(tasks)
+      epicDb.getPreviousProgress().then(setPrevProgress).catch(() => {})
       const flags = await planningDb.getTesterFlags()
       setTesterFlags(flags)
     } catch (e: any) {
@@ -1089,6 +1112,27 @@ export default function EpicView() {
       }
     } finally {
       setSyncing(false)
+    }
+  }
+
+  // ── Sync ทีละ Epic (ปุ่ม ↻ รายแถว) ─────────────────────────────────────────────
+  async function syncOneEpic(epicNo: number) {
+    let cfg: AzureDevOpsConfig | null = null
+    try { cfg = JSON.parse(localStorage.getItem(ADO_CONFIG_KEY) ?? 'null') } catch { /* ignore */ }
+    if (!cfg?.orgUrl || !cfg?.project || !cfg?.pat) { setSyncAuthErr(undefined); setShowSync(true); return }
+    setSyncingEpicNos(s => new Set(s).add(epicNo)); setSyncErrMsg(null)
+    try {
+      const result = await syncEpicsFromAdo(cfg, holidaySet, epicNo)
+      const fresh = await epicDb.getByEpicNo(epicNo)
+      if (fresh) setEpics(prev => prev.map(e => e.epicNo === epicNo ? fresh : e))
+      setSyncMsg(`Sync Epic ${epicNo} เสร็จ${result.errors.length ? ` | error: ${result.errors[0]}` : ''}`)
+    } catch (e: any) {
+      const msg: string = e?.message ?? ''
+      setSyncErrMsg(/401|403|unauthorized/i.test(msg)
+        ? 'PAT หมดอายุหรือไม่ถูกต้อง — กรุณาอัปเดต PAT ใหม่'
+        : `Sync Epic ${epicNo} ล้มเหลว: ${msg}`)
+    } finally {
+      setSyncingEpicNos(s => { const n = new Set(s); n.delete(epicNo); return n })
     }
   }
 
@@ -1405,6 +1449,7 @@ export default function EpicView() {
               employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
               sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
               expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
+              prevProgress={prevProgress} onSyncEpic={syncOneEpic} syncingEpicNos={syncingEpicNos}
             />
           ) : tab === 'gantt' ? (
             <TesterGanttView
@@ -1436,6 +1481,7 @@ export default function EpicView() {
                 employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
                 sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
                 expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
+                onSyncEpic={syncOneEpic} syncingEpicNos={syncingEpicNos}
               />
             </div>
           ) : tab === 'delayplan' ? (
@@ -1465,6 +1511,7 @@ export default function EpicView() {
                 employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
                 sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
                 expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
+                onSyncEpic={syncOneEpic} syncingEpicNos={syncingEpicNos}
               />
             </div>
           ) : tab === 'noplan' ? (
@@ -1478,6 +1525,7 @@ export default function EpicView() {
                 employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
                 sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
                 expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
+                onSyncEpic={syncOneEpic} syncingEpicNos={syncingEpicNos}
               />
             </div>
           ) : tab === 'unassigned' ? (
@@ -1491,6 +1539,7 @@ export default function EpicView() {
                 employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
                 sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
                 expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
+                onSyncEpic={syncOneEpic} syncingEpicNos={syncingEpicNos}
               />
             </div>
           ) : null}
