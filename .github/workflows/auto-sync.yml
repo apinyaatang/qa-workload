@@ -2,7 +2,10 @@ name: Auto Sync ADO → Supabase
 
 on:
   schedule:
-    - cron: '0 2 * * 1-5'   # 09:00 Bangkok (UTC+7) วันจันทร์–ศุกร์
+    # GitHub มักรัน schedule ช้ากว่าเวลาที่ตั้ง (ยิ่งตรงต้นชั่วโมงยิ่งช้า) จึงตั้งไว้ 2 รอบก่อน 09:00
+    # และเลี่ยงนาทีที่ 0 — รันซ้ำได้ไม่มีผลเสีย ข้อมูลถูกเขียนทับด้วยค่าล่าสุด
+    - cron: '7 0 * * *'     # 07:07 Bangkok (UTC+7) ทุกวัน
+    - cron: '37 0 * * *'    # 07:37 Bangkok สำรอง
   workflow_dispatch:          # กด Run manually ได้ด้วยจากหน้า GitHub Actions
 
 jobs:
@@ -12,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Run ADO sync
         env:
           ADO_ORG_URL:       ${{ secrets.ADO_ORG_URL }}

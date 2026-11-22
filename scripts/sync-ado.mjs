@@ -7,7 +7,10 @@
  * Env: ADO_ORG_URL, ADO_PROJECT, ADO_PAT, SUPABASE_URL, SUPABASE_ANON_KEY
  */
 
-const { ADO_ORG_URL, ADO_PROJECT, ADO_PAT, SUPABASE_URL, SUPABASE_ANON_KEY } = process.env
+const { ADO_ORG_URL, ADO_PROJECT, ADO_PAT, SUPABASE_ANON_KEY } = process.env
+// รับได้ทั้ง https://xxx.supabase.co และแบบที่ก๊อปมาจากหน้า API ของ Supabase (…/rest/v1/)
+// ถ้าไม่ตัด /rest/v1 ออก URL จะกลายเป็น …/rest/v1/rest/v1/epics แล้วได้ 404
+const SUPABASE_URL = (process.env.SUPABASE_URL ?? '').trim().replace(/\/+$/, '').replace(/\/rest\/v1$/, '')
 if (!ADO_ORG_URL || !ADO_PROJECT || !ADO_PAT || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.error('Missing required env vars: ADO_ORG_URL, ADO_PROJECT, ADO_PAT, SUPABASE_URL, SUPABASE_ANON_KEY')
   process.exit(1)
