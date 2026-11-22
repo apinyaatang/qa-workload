@@ -77,14 +77,14 @@ async function sbPost(path, body) {
 }
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
+// ADO ส่งวันที่เป็น UTC → บวก 7 ชม. เป็นเวลาไทยก่อนตัดเป็นวันที่
+// (GitHub Actions รันด้วย UTC ถ้าไม่บวก วันที่จะถอยไป 1 วัน) — ตรงกับ src/lib/epicDb.ts
+const BKK_OFFSET_MS = 7 * 3_600_000
 function adoDateToIso(raw) {
   if (!raw) return null
-  const d = new Date(raw)
-  if (isNaN(d.getTime())) return null
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
+  const t = Date.parse(raw)
+  if (isNaN(t)) return null
+  return new Date(t + BKK_OFFSET_MS).toISOString().slice(0, 10)
 }
 
 function adoPersonName(v) {
@@ -98,20 +98,25 @@ function getIterationNumber(path) {
   return match ? parseInt(match[1], 10) : 0
 }
 
-function subtractDays(isoDate, days) {
-  if (!isoDate || days == null) return null
-  const d = new Date(isoDate + 'T00:00:00')
-  d.setDate(d.getDate() - days)
-  return d.toISOString().slice(0, 10)
-}
-
-function calcTestDate(uatDate, targetDate, estDays) {
+// ตรงกับ calcEpicTestDate + subtractWorkingDaysH ในแอป:
+// มี Estimate → − N วันทำการ (ข้ามเสาร์-อาทิตย์และวันหยุดใน public_holidays) · ไม่มี → − 1 วัน
+const DAY_MS = 86_400_000
+function calcTestDate(uatDate, targetDate, estDays, holidays) {
   const base = uatDate || targetDate
   if (!base) return null
-  if (estDays != null && estDays > 0) return subtractDays(base, estDays)
-  const d = new Date(base + 'T00:00:00')
-  d.setDate(d.getDate() - 1)
-  return d.toISOString().slice(0, 10)
+  let cursor = Date.parse(base + 'T00:00:00Z')
+  if (isNaN(cursor)) return null
+  if (estDays != null && estDays > 0) {
+    let remaining = Math.ceil(estDays)
+    while (remaining > 0) {
+      cursor -= DAY_MS
+      const dow = new Date(cursor).getUTCDay()
+      const iso = new Date(cursor).toISOString().slice(0, 10)
+      if (dow !== 0 && dow !== 6 && !holidays.has(iso)) remaining--
+    }
+    return new Date(cursor).toISOString().slice(0, 10)
+  }
+  return new Date(cursor - DAY_MS).toISOString().slice(0, 10)
 }
 
 // ── Item bucket definitions ───────────────────────────────────────────────────
@@ -163,6 +168,7 @@ async function main() {
 
   // Step 4: Fetch existing epics from Supabase
   const existing = await sbGet('epics?select=id,epic_no,test_estimate_day,uat_date,target_date&limit=10000')
+  const holidays = new Set((await sbGet('public_holidays?select=date&limit=10000')).map(h => String(h.date).slice(0, 10)))
   const existingMap = new Map(existing.map(r => [r.epic_no, r]))
 
   // Step 5: Upsert Epic metadata
@@ -175,7 +181,7 @@ async function main() {
     const ex = existingMap.get(epicNo)
     const adoEstRaw = f['Custom.TestEstimate']
     const estDay = adoEstRaw != null ? (Number(adoEstRaw) || null) : (ex?.test_estimate_day ?? null)
-    const testDate = calcTestDate(uatDate, targetDate, estDay)
+    const testDate = calcTestDate(uatDate, targetDate, estDay, holidays)
 
     const adoFields = {
       epic_no: epicNo,

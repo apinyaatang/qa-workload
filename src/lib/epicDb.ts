@@ -8,16 +8,17 @@ export function calcEpicTestDate(
   estimateDays: number | null,
   holidays: Set<string> = new Set(),
 ): string | null {
+  // กฎ: มี Estimate → UAT/Target − N วันทำการ · ไม่มี → UAT/Target − 1 วัน
+  // คำนวณบน UTC ล้วน — เดิมสร้าง Date ตามเวลาท้องถิ่นแล้ว toISOString() ทำให้เบราว์เซอร์ไทย
+  // ได้วันที่เร็วไปอีก 1 วัน (UAT − 2 / UAT − 1 − N)
   const base = uatDate || targetDate
   if (!base) return null
-  const baseDate = new Date(base + 'T00:00:00')
+  const baseDate = new Date(base + 'T00:00:00Z')
   if (isNaN(baseDate.getTime())) return null
   if (estimateDays != null && estimateDays > 0) {
     return subtractWorkingDaysH(baseDate, estimateDays, holidays).toISOString().slice(0, 10)
   }
-  const d = new Date(baseDate)
-  d.setDate(d.getDate() - 1)
-  return d.toISOString().slice(0, 10)
+  return new Date(baseDate.getTime() - 86_400_000).toISOString().slice(0, 10)
 }
 
 export const PROGRESS_RETENTION_DAYS = 30
@@ -181,16 +182,15 @@ function getIterationNumber(path: string): number {
   return match ? parseInt(match[1], 10) : 0
 }
 
-// ADO returns dates as UTC ISO strings (e.g. "2026-08-19T17:00:00Z" = midnight Bangkok time).
-// Parse with local timezone so the date reflects the user's local calendar day.
+// ADO ส่งวันที่เป็น UTC (เช่น "2026-08-19T17:00:00Z" = เที่ยงคืน 20/08 เวลาไทย)
+// บวก 7 ชม. ให้ชัดเจนแล้วค่อยตัดเป็นวันที่ — ไม่พึ่ง timezone ของเครื่องที่รัน
+// (scripts/sync-ado.mjs ใช้ตรรกะเดียวกัน แก้ต้องแก้ทั้งสองที่)
+const BKK_OFFSET_MS = 7 * 3_600_000
 function adoDateToIso(raw: string | null | undefined): string | null {
   if (!raw) return null
-  const d = new Date(raw)
-  if (isNaN(d.getTime())) return null
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
+  const t = Date.parse(raw)
+  if (isNaN(t)) return null
+  return new Date(t + BKK_OFFSET_MS).toISOString().slice(0, 10)
 }
 
 // Custom.PMName มาเป็น string แต่ถ้าวันหนึ่งถูกเปลี่ยนเป็น Identity field จะมาเป็น object
