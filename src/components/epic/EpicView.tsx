@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   RefreshCw, Loader2, AlertCircle, X, CloudDownload, ChevronDown,
-  AlertTriangle, ArrowUp, ArrowDown, Maximize2, Minimize2, SlidersHorizontal,
+  AlertTriangle, ArrowUp, ArrowDown, Maximize2, Minimize2, SlidersHorizontal, Trash2,
 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { epicDb, syncEpicsFromAdo, calcEpicTestDate, type PrevProgress } from '../../lib/epicDb'
@@ -599,9 +599,12 @@ interface TableProps {
   prevProgress?: Map<number, PrevProgress>
   onSyncEpic?: (epicNo: number) => void
   syncingEpicNos?: Set<number>
+  /** ลบ Epic รายแถว (ใช้กับ Epic ที่ถูกลบใน ADO แล้วแต่ยังค้างใน DB) */
+  onDeleteEpic?: (epic: Epic) => void
+  deletingEpicNos?: Set<number>
 }
 
-function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, sort, onSort, onSave, today, warnUntilIso, expanded, onToggleExpand, showArchived = false, prevProgress, onSyncEpic, syncingEpicNos }: TableProps) {
+function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, sort, onSort, onSave, today, warnUntilIso, expanded, onToggleExpand, showArchived = false, prevProgress, onSyncEpic, syncingEpicNos, onDeleteEpic, deletingEpicNos }: TableProps) {
   const cols = COL_DEFS.filter(c => c.key !== 'archivedPct' || showArchived)
   const todayIso = localIsoDate(today)
   const empNames = employees.map(e => e.name)
@@ -794,7 +797,15 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
                       className="ml-1 align-middle text-gray-300 hover:text-blue-600 dark:text-slate-500 dark:hover:text-blue-400 disabled:cursor-wait">
                       <RefreshCw size={11} className={epicSyncing ? 'animate-spin text-blue-500' : ''} />
                     </button>
-                  )}</td>}
+                  )}{epic.epicNo !== 0 && onDeleteEpic && (() => {
+                    const deleting = deletingEpicNos?.has(epic.epicNo) ?? false
+                    return (
+                      <button onClick={() => !deleting && onDeleteEpic(epic)} disabled={deleting} title="ลบ Epic นี้ออกจากระบบ"
+                        className="ml-1 align-middle text-gray-300 hover:text-red-600 dark:text-slate-500 dark:hover:text-red-400 disabled:cursor-wait">
+                        {deleting ? <Loader2 size={11} className="animate-spin text-red-500" /> : <Trash2 size={11} />}
+                      </button>
+                    )
+                  })()}</td>}
                   {vis('iteration')  && <td className={tdBase}><span className="block truncate text-xs" title={epic.iteration}>{stripBuzzebees(epic.iteration) || '—'}</span></td>}
                   {vis('project')    && <td className={tdBase}><span className="block truncate text-xs" title={epic.project}>{stripBuzzebees(epic.project) || '—'}</span></td>}
                   {vis('feature')    && <td className={tdBase}><span className="block truncate font-medium text-xs" title={epic.feature}>{epic.feature || '—'}</span></td>}
@@ -941,6 +952,7 @@ export default function EpicView() {
   const [filterDeployProject, setFilterDeployProject] = useState<string[]>([])
   const [prevProgress,   setPrevProgress]   = useState<Map<number, PrevProgress>>(new Map())
   const [syncingEpicNos, setSyncingEpicNos] = useState<Set<number>>(new Set())
+  const [deletingEpicNos, setDeletingEpicNos] = useState<Set<number>>(new Set())
   const [filterDeployPms,     setFilterDeployPms]     = useState<string[]>([])
   const [filterDeployOwners,  setFilterDeployOwners]  = useState<string[]>([])
 
@@ -1101,7 +1113,8 @@ export default function EpicView() {
         : result.totalFromAdo === 0
         ? ' ⚠️ ไม่พบ Epic ใน Azure DevOps (ตรวจ Project Name และ PAT)'
         : ` (พบทั้งหมด ${result.totalFromAdo}, ผ่าน filter ${result.total})`
-      setSyncMsg(`Sync เสร็จ: เพิ่ม ${result.inserted} แถว, อัปเดต ${result.updated} แถว | Item counts: ${result.itemsUpdated} Epics (${result.itemsTotal} items)${filterNote}${result.errors.length ? ` | error ${result.errors.length}: ${result.errors[0]}` : ''}`)
+      const delNote = result.deleted ? ` | ลบ ${result.deleted} Epic ที่ไม่มีใน ADO แล้ว (${result.deletedEpicNos.join(', ')})` : ''
+      setSyncMsg(`Sync เสร็จ: เพิ่ม ${result.inserted} แถว, อัปเดต ${result.updated} แถว${delNote} | Item counts: ${result.itemsUpdated} Epics (${result.itemsTotal} items)${filterNote}${result.errors.length ? ` | error ${result.errors.length}: ${result.errors[0]}` : ''}`)
       await load()
     } catch (e: any) {
       const msg: string = e?.message ?? ''
@@ -1123,6 +1136,12 @@ export default function EpicView() {
     setSyncingEpicNos(s => new Set(s).add(epicNo)); setSyncErrMsg(null)
     try {
       const result = await syncEpicsFromAdo(cfg, holidaySet, epicNo)
+      if (result.deletedEpicNos.includes(epicNo)) {
+        setEpics(prev => prev.filter(e => e.epicNo !== epicNo))
+        setPrevProgress(prev => { const m = new Map(prev); m.delete(epicNo); return m })
+        setSyncMsg(`Epic ${epicNo} ไม่มีใน ADO แล้ว — ลบออกจากระบบเรียบร้อย`)
+        return
+      }
       const fresh = await epicDb.getByEpicNo(epicNo)
       if (fresh) setEpics(prev => prev.map(e => e.epicNo === epicNo ? fresh : e))
       setSyncMsg(`Sync Epic ${epicNo} เสร็จ${result.errors.length ? ` | error: ${result.errors[0]}` : ''}`)
@@ -1133,6 +1152,24 @@ export default function EpicView() {
         : `Sync Epic ${epicNo} ล้มเหลว: ${msg}`)
     } finally {
       setSyncingEpicNos(s => { const n = new Set(s); n.delete(epicNo); return n })
+    }
+  }
+
+  // ── ลบ Epic รายแถว ─────────────────────────────────────────────────────────────
+  async function deleteEpic(epic: Epic) {
+    const title = epic.feature ? ` – ${epic.feature}` : ''
+    if (!window.confirm(`ลบ Epic ${epic.epicNo}${title} ?\n\nข้อมูลที่ Tester กรอกไว้และประวัติ % ของ Epic นี้จะถูกลบด้วย\n(ถ้า Epic ยังมีอยู่ใน ADO รอบ Sync ถัดไปจะถูกดึงกลับมาใหม่)`)) return
+    setDeletingEpicNos(s => new Set(s).add(epic.epicNo)); setSyncErrMsg(null)
+    try {
+      const n = await epicDb.deleteByEpicNos([epic.epicNo])
+      if (n === 0) throw new Error('ไม่มีแถวถูกลบ (อาจไม่มีสิทธิ์ลบในฐานข้อมูล)')
+      setEpics(prev => prev.filter(e => e.epicNo !== epic.epicNo))
+      setPrevProgress(prev => { const m = new Map(prev); m.delete(epic.epicNo); return m })
+      setSyncMsg(`ลบ Epic ${epic.epicNo} เรียบร้อย`)
+    } catch (e: any) {
+      setSyncErrMsg(`ลบ Epic ${epic.epicNo} ไม่สำเร็จ: ${e?.message ?? e}`)
+    } finally {
+      setDeletingEpicNos(s => { const n = new Set(s); n.delete(epic.epicNo); return n })
     }
   }
 
@@ -1449,7 +1486,7 @@ export default function EpicView() {
               employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
               sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
               expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
-              prevProgress={prevProgress} onSyncEpic={syncOneEpic} syncingEpicNos={syncingEpicNos}
+              prevProgress={prevProgress} onSyncEpic={syncOneEpic} syncingEpicNos={syncingEpicNos} onDeleteEpic={deleteEpic} deletingEpicNos={deletingEpicNos}
             />
           ) : tab === 'gantt' ? (
             <TesterGanttView
@@ -1481,7 +1518,7 @@ export default function EpicView() {
                 employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
                 sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
                 expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
-                onSyncEpic={syncOneEpic} syncingEpicNos={syncingEpicNos}
+                onSyncEpic={syncOneEpic} syncingEpicNos={syncingEpicNos} onDeleteEpic={deleteEpic} deletingEpicNos={deletingEpicNos}
               />
             </div>
           ) : tab === 'delayplan' ? (
@@ -1511,7 +1548,7 @@ export default function EpicView() {
                 employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
                 sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
                 expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
-                onSyncEpic={syncOneEpic} syncingEpicNos={syncingEpicNos}
+                onSyncEpic={syncOneEpic} syncingEpicNos={syncingEpicNos} onDeleteEpic={deleteEpic} deletingEpicNos={deletingEpicNos}
               />
             </div>
           ) : tab === 'noplan' ? (
@@ -1525,7 +1562,7 @@ export default function EpicView() {
                 employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
                 sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
                 expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
-                onSyncEpic={syncOneEpic} syncingEpicNos={syncingEpicNos}
+                onSyncEpic={syncOneEpic} syncingEpicNos={syncingEpicNos} onDeleteEpic={deleteEpic} deletingEpicNos={deletingEpicNos}
               />
             </div>
           ) : tab === 'unassigned' ? (
@@ -1539,7 +1576,7 @@ export default function EpicView() {
                 employees={activeEmployees} testLeadOptions={testLeadOptions} testerFlags={testerFlags}
                 sort={sort} onSort={handleSort} onSave={handleSave} today={today} warnUntilIso={warnUntilIso}
                 expanded={expanded} onToggleExpand={() => setExpanded(e => !e)}
-                onSyncEpic={syncOneEpic} syncingEpicNos={syncingEpicNos}
+                onSyncEpic={syncOneEpic} syncingEpicNos={syncingEpicNos} onDeleteEpic={deleteEpic} deletingEpicNos={deletingEpicNos}
               />
             </div>
           ) : null}

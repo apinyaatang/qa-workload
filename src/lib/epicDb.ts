@@ -117,6 +117,38 @@ export const epicDb = {
     return (data ?? []).map(fromRow)
   },
 
+  /** epic_no ทั้งหมดใน DB (แบ่งหน้า 1000 แถว กันชน max rows ของ Supabase) */
+  async getAllEpicNos(): Promise<number[]> {
+    if (!isConfigured) return []
+    const out: number[] = []
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await (supabase as any)
+        .from('epics').select('epic_no').order('epic_no', { ascending: true }).range(from, from + 999)
+      if (error) throw new Error(`[epicDb/getAllEpicNos] ${error.message}`)
+      out.push(...(data ?? []).map((r: any) => Number(r.epic_no)))
+      if (!data || data.length < 1000) break
+    }
+    return out
+  },
+
+  /**
+   * ลบ Epic ออกจาก DB พร้อมประวัติ % (epic_progress) — คืนจำนวนแถว epics ที่ลบได้จริง
+   * งานใน Planning ที่อ้าง epic_no ไม่ถูกลบตาม
+   */
+  async deleteByEpicNos(epicNos: number[]): Promise<number> {
+    if (!isConfigured || epicNos.length === 0) return 0
+    let deleted = 0
+    for (let i = 0; i < epicNos.length; i += 200) {
+      const chunk = epicNos.slice(i, i + 200)
+      const { data, error } = await (supabase as any).from('epics').delete().in('epic_no', chunk).select('epic_no')
+      if (error) throw new Error(`[epicDb/deleteByEpicNos] ${error.message}`)
+      deleted += (data ?? []).length
+      const { error: hErr } = await (supabase as any).from('epic_progress').delete().in('epic_no', chunk)
+      if (hErr) throw new Error(`[epicDb/deleteByEpicNos] epic_progress: ${hErr.message}`)
+    }
+    return deleted
+  },
+
   async getByEpicNo(epicNo: number): Promise<Epic | null> {
     if (!isConfigured) return null
     const { data, error } = await (supabase as any).from('epics').select('*').eq('epic_no', epicNo).maybeSingle()
@@ -225,7 +257,12 @@ export interface SyncResult {
   samplePaths:    string[] // first 3 IterationPath values (for debugging)
   itemsTotal:     number   // total User Story/Bug items fetched
   itemsUpdated:   number   // epics whose item counts were saved
+  deleted:        number   // epics removed from DB because they no longer exist in ADO
+  deletedEpicNos: number[]
 }
+
+/** WIQL คืนได้สูงสุด 20,000 รายการ — ถ้าชนเพดาน ผลอาจไม่ครบ ห้ามใช้ตัดสินว่า Epic ถูกลบ */
+const WIQL_MAX = 20_000
 
 /**
  * @param onlyEpicNo ถ้าระบุ จะ Sync เฉพาะ Epic นั้น (ปุ่ม ↻ รายแถว) — ใช้ตรรกะเดียวกันทุกขั้น
@@ -241,7 +278,7 @@ export async function syncEpicsFromAdo(
   const authHeader = `Basic ${base64Pat}`
   const apiBase    = `${orgUrl.replace(/\/$/, '')}/${encodeURIComponent(project)}/_apis`
 
-  const result: SyncResult = { inserted: 0, updated: 0, skipped: 0, total: 0, totalFromAdo: 0, errors: [], samplePaths: [], itemsTotal: 0, itemsUpdated: 0 }
+  const result: SyncResult = { inserted: 0, updated: 0, skipped: 0, total: 0, totalFromAdo: 0, errors: [], samplePaths: [], itemsTotal: 0, itemsUpdated: 0, deleted: 0, deletedEpicNos: [] }
 
   // ── Item bucket definitions ──────────────────────────────────────────────────
   const ITEM_BUCKET: Record<string, string> = {
@@ -255,6 +292,19 @@ export async function syncEpicsFromAdo(
   // ── Step 1: WIQL — get all Epic IDs ─────────────────────────────────────────
   let allIds: number[]
   if (onlyEpicNo) {
+    // เช็กก่อนว่ายังมี Epic นี้ใน ADO ไหม (ถูก delete แล้ว WIQL จะไม่คืนมา) → ลบออกจาก DB
+    const chkRes = await fetch(`${apiBase}/wit/wiql?api-version=7.0`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+      body: JSON.stringify({ query: `SELECT [System.Id] FROM WorkItems WHERE [System.Id] = ${onlyEpicNo} AND [System.WorkItemType] = 'Epic'` }),
+    })
+    if (!chkRes.ok) throw new Error(`WIQL failed: ${chkRes.status} ${await chkRes.text()}`)
+    const chk = await chkRes.json()
+    if ((chk.workItems ?? []).length === 0) {
+      result.deleted = await epicDb.deleteByEpicNos([onlyEpicNo])
+      result.deletedEpicNos = result.deleted ? [onlyEpicNo] : []
+      return result
+    }
     allIds = [onlyEpicNo]
   } else {
   const wiqlRes = await fetch(`${apiBase}/wit/wiql?api-version=7.0`, {
@@ -270,6 +320,22 @@ export async function syncEpicsFromAdo(
   }
   result.totalFromAdo = allIds.length
   if (allIds.length === 0) return result
+
+  // ── Step 1b: ลบ Epic ใน DB ที่ไม่มีใน ADO แล้ว (ถูก delete) ───────────────────
+  // ลบเฉพาะที่หายจาก ADO — Epic ที่ยังอยู่แต่ไม่ผ่าน filter Iteration / State Removed เก็บไว้
+  // ข้ามถ้า WIQL ชนเพดาน (ผลอาจไม่ครบ)
+  if (!onlyEpicNo && allIds.length < WIQL_MAX && isConfigured) {
+    try {
+      const adoSet = new Set(allIds)
+      const gone = (await epicDb.getAllEpicNos()).filter(n => n > 0 && !adoSet.has(n))
+      if (gone.length) {
+        result.deleted = await epicDb.deleteByEpicNos(gone)
+        result.deletedEpicNos = gone
+      }
+    } catch (e: any) {
+      result.errors.push(`Cleanup deleted epics: ${e.message}`)
+    }
+  }
 
   // ── Step 2: Batch fetch details (max 200 per request) ────────────────────────
   const BATCH = 200

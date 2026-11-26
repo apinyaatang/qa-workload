@@ -69,6 +69,27 @@ async function sbPatch(path, body) {
   return r.ok
 }
 
+async function sbDelete(path) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { method: 'DELETE', headers: SB_HEADERS })
+  if (!r.ok) throw new Error(`Supabase DELETE ${r.status}: ${path}`)
+  return r.json()
+}
+
+// epic_no ทั้งหมดใน DB (แบ่งหน้า 1000 แถว กันชน max rows ของ Supabase)
+async function getAllDbEpicNos() {
+  const out = []
+  for (let from = 0; ; from += 1000) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/epics?select=epic_no&order=epic_no.asc`, {
+      headers: { ...SB_HEADERS, Range: `${from}-${from + 999}` },
+    })
+    if (!r.ok) throw new Error(`Supabase GET ${r.status}: epics (epic_no)`)
+    const rows = await r.json()
+    out.push(...rows.map(x => Number(x.epic_no)))
+    if (rows.length < 1000) break
+  }
+  return out
+}
+
 async function sbPost(path, body) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method: 'POST', headers: SB_HEADERS, body: JSON.stringify(body),
@@ -152,6 +173,24 @@ async function main() {
   )
   console.log(`Found ${allIds.length} Epics in ADO`)
   if (allIds.length === 0) { console.log('Nothing to sync.'); return }
+
+  // Step 1b: ลบ Epic ใน DB ที่ไม่มีใน ADO แล้ว (ถูก delete) — เก็บตัวที่ยังอยู่แต่ไม่ผ่าน filter ไว้
+  // ข้ามถ้า WIQL ชนเพดาน 20,000 (ผลอาจไม่ครบ)
+  if (allIds.length < 20000) {
+    try {
+      const adoSet = new Set(allIds)
+      const gone = (await getAllDbEpicNos()).filter(n => n > 0 && !adoSet.has(n))
+      let deleted = 0
+      for (let i = 0; i < gone.length; i += 200) {
+        const list = gone.slice(i, i + 200).join(',')
+        deleted += (await sbDelete(`epics?epic_no=in.(${list})`)).length
+        await sbDelete(`epic_progress?epic_no=in.(${list})`)
+      }
+      console.log(`Deleted ${deleted} Epics no longer in ADO${gone.length ? `: ${gone.join(', ')}` : ''}`)
+    } catch (e) {
+      result.errors.push(`Cleanup deleted epics: ${e.message}`)
+    }
+  }
 
   // Step 2: Batch fetch Epic details
   const ADO_FIELDS = [
