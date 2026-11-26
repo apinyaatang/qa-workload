@@ -792,12 +792,12 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
               return (
                 <tr key={epic.id} className={`${rowBg} hover:bg-blue-50/30 dark:hover:bg-slate-700/40 transition-colors`}>
                   {vis('no')         && <td className={`${tdBase} text-center text-gray-400 text-[11px]`}>{idx + 1}</td>}
-                  {vis('epicNo')     && <td className={`${tdBase} font-mono`}>{epic.epicNo === 0 ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-sans">Extra</span> : (() => { const url = adoItemUrl(epic.epicNo); return url ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{epic.epicNo}</a> : <span className="text-blue-700 dark:text-blue-300">{epic.epicNo}</span> })()}{epic.epicNo !== 0 && onSyncEpic && (
+                  {vis('epicNo')     && <td className={`${tdBase} font-mono`}>{epic.epicNo !== 0 && onSyncEpic && (
                     <button onClick={() => !epicSyncing && onSyncEpic(epic.epicNo)} disabled={epicSyncing} title="Sync Epic นี้จาก ADO"
-                      className="ml-1 align-middle text-gray-300 hover:text-blue-600 dark:text-slate-500 dark:hover:text-blue-400 disabled:cursor-wait">
+                      className="mr-1 align-middle text-gray-300 hover:text-blue-600 dark:text-slate-500 dark:hover:text-blue-400 disabled:cursor-wait">
                       <RefreshCw size={11} className={epicSyncing ? 'animate-spin text-blue-500' : ''} />
                     </button>
-                  )}{epic.epicNo !== 0 && onDeleteEpic && (() => {
+                  )}{epic.epicNo === 0 ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-sans">Extra</span> : (() => { const url = adoItemUrl(epic.epicNo); return url ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{epic.epicNo}</a> : <span className="text-blue-700 dark:text-blue-300">{epic.epicNo}</span> })()}{epic.epicNo !== 0 && onDeleteEpic && (() => {
                     const deleting = deletingEpicNos?.has(epic.epicNo) ?? false
                     return (
                       <button onClick={() => !deleting && onDeleteEpic(epic)} disabled={deleting} title="ลบ Epic นี้ออกจากระบบ"
