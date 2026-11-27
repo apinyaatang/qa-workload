@@ -75,6 +75,7 @@ export function extraTaskToEpic(task: ExtraTask, holidays: Set<string> = new Set
     feature:         task.remark || task.projectName,
     state:           task.status,
     pmName:          '',
+    baName:          '',
     sitDate:         null,
     uatDate:         null,
     targetDate:      task.goLiveDate,

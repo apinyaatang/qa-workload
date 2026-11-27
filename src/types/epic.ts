@@ -7,6 +7,7 @@ export interface Epic {
   feature:         string        // System.Title
   state:           string        // System.State
   pmName:          string        // Custom.PMName
+  baName:          string        // System.AssignedTo ของ Epic (= BA)
   sitDate:         string | null // Custom.SITDate
   uatDate:         string | null // Custom.UATDate
   targetDate:      string | null // Microsoft.VSTS.Scheduling.TargetDate

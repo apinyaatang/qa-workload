@@ -525,6 +525,7 @@ const COL_DEFS = [
   { key: 'type',       label: 'Type',        sortField: null,              hideable: true,  defaultW: 80  },
   { key: 'state',      label: 'State',       sortField: 'state',           hideable: true,  defaultW: 110 },
   { key: 'pmName',     label: 'PM Name',     sortField: 'pmName',          hideable: true,  defaultW: 170 },
+  { key: 'baName',     label: 'BA',          sortField: 'baName',          hideable: true,  defaultW: 170 },
   { key: 'testOwner',  label: 'Test Owner',  sortField: 'testOwner',       hideable: true,  defaultW: 170 },
   { key: 'buddy1',     label: 'Buddy 1',     sortField: null,              hideable: true,  defaultW: 170 },
   { key: 'buddy2',     label: 'Buddy 2',     sortField: null,              hideable: true,  defaultW: 170 },
@@ -546,7 +547,7 @@ const COL_DEFS = [
 ] as const
 
 type ColKey = typeof COL_DEFS[number]['key']
-type SortField = 'epicNo' | 'iteration' | 'project' | 'feature' | 'itemType' | 'state' | 'testOwner' | 'testLead' | 'testEstimateDay' | 'testDate' | 'sitDate' | 'uatDate' | 'targetDate' | 'testingPercent' | 'devPercent' | 'baPercent' | 'donePercent' | 'archivedPercent' | 'pmName'
+type SortField = 'epicNo' | 'iteration' | 'project' | 'feature' | 'itemType' | 'state' | 'testOwner' | 'testLead' | 'testEstimateDay' | 'testDate' | 'sitDate' | 'uatDate' | 'targetDate' | 'testingPercent' | 'devPercent' | 'baPercent' | 'donePercent' | 'archivedPercent' | 'pmName' | 'baName'
 
 // Store HIDDEN cols (not visible) so new columns auto-appear without clearing localStorage
 const LS_HIDDEN = 'epic_hidden_cols'
@@ -758,6 +759,7 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
               {vis('type')       && <Th colKey="type"       label="Type"        sortField="itemType" />}
               {vis('state')      && <Th colKey="state"      label="State"       sortField="state" />}
               {vis('pmName')     && <Th colKey="pmName"     label="PM Name"     sortField="pmName" />}
+              {vis('baName')     && <Th colKey="baName"     label="BA"          sortField="baName" />}
               {vis('testOwner')  && <Th colKey="testOwner"  label="Test Owner"  sortField="testOwner" />}
               {vis('buddy1')     && <Th colKey="buddy1"     label="Buddy 1" />}
               {vis('buddy2')     && <Th colKey="buddy2"     label="Buddy 2" />}
@@ -812,6 +814,7 @@ function EpicTable({ rows, savingIds, employees, testLeadOptions, testerFlags, s
                   {vis('type')       && <td className={tdBase}><span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 truncate block">{epic.itemType || '—'}</span></td>}
                   {vis('state')      && <td className={tdBase}><span className="text-xs truncate block">{epic.state || '—'}</span></td>}
                   {vis('pmName')     && <td className={tdBase}><span className="text-xs truncate block" title={epic.pmName}>{epic.pmName || '—'}</span></td>}
+                  {vis('baName')     && <td className={tdBase}><span className="text-xs truncate block" title={epic.baName}>{epic.baName || '—'}</span></td>}
                   {vis('testOwner')  && (
                     <td className={tdBase}>
                       <PortalSelect value={epic.testOwner} options={['Unassigned', ...empNames]} placeholder="— Test Owner —" onChange={v => onSave(epic.id, { testOwner: v })} minWidth={180} />
@@ -930,6 +933,7 @@ export default function EpicView() {
   const [filterStates,      setFilterStates]      = useState<string[]>([])
   const [filterTestLeads,   setFilterTestLeads]   = useState<string[]>([])
   const [filterPms,         setFilterPms]         = useState<string[]>([])
+  const [filterBas,         setFilterBas]         = useState<string[]>([])
   // Assignee Workload: กรองทุกคนที่เป็น testOwner หรือ buddy1/2/3
   // มาจากการคลิก "ดู Epic ของคนนี้" ในหน้า Monitor and Assign
   const [filterAssignees,   setFilterAssignees]   = useState<string[]>(
@@ -954,6 +958,7 @@ export default function EpicView() {
   const [syncingEpicNos, setSyncingEpicNos] = useState<Set<number>>(new Set())
   const [deletingEpicNos, setDeletingEpicNos] = useState<Set<number>>(new Set())
   const [filterDeployPms,     setFilterDeployPms]     = useState<string[]>([])
+  const [filterDeployBas,     setFilterDeployBas]     = useState<string[]>([])
   const [filterDeployOwners,  setFilterDeployOwners]  = useState<string[]>([])
 
   // Sort
@@ -1213,6 +1218,7 @@ export default function EpicView() {
       if (filterStates.length    && !filterStates.includes(e.state))      return false
       if (filterTestLeads.length && !filterTestLeads.includes(e.testLead)) return false
       if (filterPms.length       && !filterPms.includes(e.pmName))         return false
+      if (filterBas.length       && !filterBas.includes(e.baName ?? ''))  return false
       if (filterAssignees.length) {
         const assigned = [e.testOwner, e.buddy1, e.buddy2, e.buddy3]
         if (!filterAssignees.some(a => assigned.includes(a))) return false
@@ -1228,12 +1234,12 @@ export default function EpicView() {
     })
   }
 
-  const hasActiveFilter = !!(search || filterOwners.length || filterAssignees.length || filterStates.length || filterTestLeads.length || filterPms.length || filterIter || filterUatFrom || filterUatTo || filterTargetFrom || filterTargetTo || filterTestDateFrom || filterTestDateTo)
+  const hasActiveFilter = !!(search || filterOwners.length || filterAssignees.length || filterStates.length || filterTestLeads.length || filterPms.length || filterBas.length || filterIter || filterUatFrom || filterUatTo || filterTargetFrom || filterTargetTo || filterTestDateFrom || filterTestDateTo)
 
   function clearAllFilters() {
     setSearch(''); setFilterOwners([]); setFilterAssignees([]); setFilterStates([]); setFilterTestLeads([])
     setFilterIter(''); setFilterUatFrom(''); setFilterUatTo(''); setFilterTargetFrom(''); setFilterTargetTo('')
-    setFilterTestDateFrom(''); setFilterTestDateTo(''); setFilterPms([])
+    setFilterTestDateFrom(''); setFilterTestDateTo(''); setFilterPms([]); setFilterBas([])
   }
 
   const mainEpics     = useMemo(() => epics.filter(e => !isDeployedEpic(e)), [epics])
@@ -1285,13 +1291,21 @@ export default function EpicView() {
   )
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const tableRows  = useMemo(() => applySort(applyFilters(allTableEpics)), [allTableEpics, search, filterOwners, filterAssignees, filterStates, filterTestLeads, filterPms, filterIter, filterUatFrom, filterUatTo, filterTargetFrom, filterTargetTo, filterTestDateFrom, filterTestDateTo, sort])
+  const tableRows  = useMemo(() => applySort(applyFilters(allTableEpics)), [allTableEpics, search, filterOwners, filterAssignees, filterStates, filterTestLeads, filterPms, filterBas, filterIter, filterUatFrom, filterUatTo, filterTargetFrom, filterTargetTo, filterTestDateFrom, filterTestDateTo, sort])
   // Gantt ต่อยอดจาก tableRows ตรงๆ เพื่อการันตีว่าเห็นชุดเดียวกับตารางเสมอ
   // ถ้าแยกไปกรองเองซ้ำ สองแท็บจะเพี้ยนจากกันทันทีที่มีคนเพิ่ม filter ใหม่
   const ganttRows  = useMemo(() => tableRows.flatMap(epicToProjects), [tableRows])
   const pmOptions = useMemo(
     () => [...new Set(epics.map(e => e.pmName).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
     [epics],
+  )
+  const baOptions = useMemo(
+    () => [...new Set(epics.map(e => e.baName).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [epics],
+  )
+  const deployBaOptions = useMemo(
+    () => [...new Set(deployedEpics.map(e => e.baName).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [deployedEpics],
   )
   const deployProjectOptions = useMemo(
     () => [...new Set(deployedEpics.map(e => stripBuzzebees(e.project)).filter(Boolean))].sort(),
@@ -1309,10 +1323,11 @@ export default function EpicView() {
     let list = deployedEpics
     if (filterDeployProject.length) list = list.filter(e => filterDeployProject.includes(stripBuzzebees(e.project)))
     if (filterDeployPms.length)     list = list.filter(e => filterDeployPms.includes(e.pmName ?? ''))
+    if (filterDeployBas.length)     list = list.filter(e => filterDeployBas.includes(e.baName ?? ''))
     if (filterDeployOwners.length)  list = list.filter(e => filterDeployOwners.includes(e.testOwner ?? ''))
     return applySort(list)
-  }, [deployedEpics, filterDeployProject, filterDeployPms, filterDeployOwners, sort])
-  const hasDeployFilter = filterDeployProject.length > 0 || filterDeployPms.length > 0 || filterDeployOwners.length > 0
+  }, [deployedEpics, filterDeployProject, filterDeployPms, filterDeployBas, filterDeployOwners, sort])
+  const hasDeployFilter = filterDeployProject.length > 0 || filterDeployPms.length > 0 || filterDeployBas.length > 0 || filterDeployOwners.length > 0
   const delayProjectOptions = useMemo(
     () => [...new Set(delayEpics.map(e => stripBuzzebees(e.project)).filter(Boolean))].sort(),
     [delayEpics],
@@ -1425,6 +1440,10 @@ export default function EpicView() {
             <MultiSelect value={filterPms} options={['', ...pmOptions]} placeholder="ทุก PM"
               onChange={setFilterPms} minWidth={148} />
 
+            {/* BA (Assigned To ของ Epic) multi-select — '' = Epic ที่ยังไม่ได้ assign */}
+            <MultiSelect value={filterBas} options={['', ...baOptions]} placeholder="ทุก BA"
+              onChange={setFilterBas} minWidth={148} />
+
             {/* Iteration single select */}
             <select value={filterIter} onChange={e => setFilterIter(e.target.value)}
               className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none">
@@ -1503,10 +1522,12 @@ export default function EpicView() {
                   onChange={setFilterDeployProject} minWidth={180} />
                 <MultiSelect value={filterDeployPms} options={['', ...deployPmOptions]} placeholder="ทุก PM"
                   onChange={setFilterDeployPms} minWidth={180} />
+                <MultiSelect value={filterDeployBas} options={['', ...deployBaOptions]} placeholder="ทุก BA"
+                  onChange={setFilterDeployBas} minWidth={180} />
                 <MultiSelect value={filterDeployOwners} options={['Unassigned', '', ...deployOwnerOptions]} placeholder="ทุก Test Owner"
                   onChange={setFilterDeployOwners} minWidth={180} />
                 {hasDeployFilter && (
-                  <button onClick={() => { setFilterDeployProject([]); setFilterDeployPms([]); setFilterDeployOwners([]) }}
+                  <button onClick={() => { setFilterDeployProject([]); setFilterDeployPms([]); setFilterDeployBas([]); setFilterDeployOwners([]) }}
                     className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 transition-colors">
                     <X size={12} /> ล้าง Filter
                   </button>

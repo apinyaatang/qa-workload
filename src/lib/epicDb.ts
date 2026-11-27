@@ -63,6 +63,7 @@ function fromRow(r: any): Epic {
     feature:         r.feature          ?? '',
     state:           r.state            ?? '',
     pmName:          r.pm_name          ?? '',
+    baName:          r.ba_name          ?? '',
     sitDate:         r.sit_date         ?? null,
     uatDate:         r.uat_date         ?? null,
     targetDate:      r.target_date      ?? null,
@@ -245,6 +246,7 @@ const ADO_FIELDS = [
   'Custom.TypeofEpic',
   'Custom.TestEstimate',
   'Custom.PMName',
+  'System.AssignedTo',
 ].join(',')
 
 export interface SyncResult {
@@ -394,6 +396,7 @@ export async function syncEpicsFromAdo(
       feature:          f['System.Title']        ?? '',
       state:            f['System.State']        ?? '',
       pm_name:          adoPersonName(f['Custom.PMName']),
+      ba_name:          adoPersonName(f['System.AssignedTo']),
       sit_date:         sitDate,
       uat_date:         uatDate,
       target_date:      targetDate,

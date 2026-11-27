@@ -196,7 +196,7 @@ async function main() {
   const ADO_FIELDS = [
     'System.Id', 'System.Title', 'System.State', 'System.AreaPath', 'System.IterationPath',
     'System.WorkItemType', 'Microsoft.VSTS.Scheduling.TargetDate',
-    'Custom.SITDate', 'Custom.UATDate', 'Custom.TypeofEpic', 'Custom.TestEstimate', 'Custom.PMName',
+    'Custom.SITDate', 'Custom.UATDate', 'Custom.TypeofEpic', 'Custom.TestEstimate', 'Custom.PMName', 'System.AssignedTo',
   ]
   const allItems = await fetchItems(allIds, ADO_FIELDS)
 
@@ -230,6 +230,7 @@ async function main() {
       feature: f['System.Title'] ?? '',
       state: f['System.State'] ?? '',
       pm_name: adoPersonName(f['Custom.PMName']),
+      ba_name: adoPersonName(f['System.AssignedTo']),
       sit_date: sitDate, uat_date: uatDate, target_date: targetDate,
       test_estimate_day: estDay, test_date: testDate,
     }
